@@ -1,0 +1,324 @@
+mod app;
+mod ui;
+
+use app::{App, FinishField, FormField, Screen};
+use boxing_core::{FighterSide, JsonMatchRepository, ScoringService};
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::{
+    env, io,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
+
+fn main() -> io::Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let mut json_path = PathBuf::from("matches.json");
+
+    let mut idx = 1;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--file" | "-f" if idx + 1 < args.len() => {
+                json_path = PathBuf::from(&args[idx + 1]);
+                idx += 2;
+            }
+            "--help" | "-h" => {
+                println!("Boxing Match Scorer (TUI MVP)");
+                println!("Usage: boxing [--file <matches.json>]");
+                return Ok(());
+            }
+            _ => {
+                idx += 1;
+            }
+        }
+    }
+
+    let repo = JsonMatchRepository::new(json_path);
+    let service = ScoringService::new(repo);
+    let mut app = App::new(service);
+
+    // Setup terminal (pure keyboard control)
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let res = run_event_loop(&mut terminal, &mut app);
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        eprintln!("Error: {:?}", err);
+    }
+
+    Ok(())
+}
+
+fn run_event_loop<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+) -> io::Result<()> {
+    let tick_rate = Duration::from_millis(100);
+    let mut last_tick = Instant::now();
+
+    loop {
+        terminal.draw(|f| ui::draw(f, app))?;
+
+        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+        if event::poll(timeout)? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    handle_key_event(app, key.code, key.modifiers);
+                }
+            }
+        }
+
+        if last_tick.elapsed() >= tick_rate {
+            let elapsed = last_tick.elapsed();
+            last_tick = Instant::now();
+            app.on_tick(elapsed);
+        }
+
+        if app.should_quit {
+            return Ok(());
+        }
+    }
+}
+
+fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
+    if modifiers.contains(KeyModifiers::CONTROL) && code == KeyCode::Char('c') {
+        app.should_quit = true;
+        return;
+    }
+
+    match app.screen {
+        Screen::Home => match code {
+            KeyCode::Char('q') | KeyCode::Char('Q') => app.should_quit = true,
+            KeyCode::Char('n') | KeyCode::Char('N') => app.open_new_match_form(),
+            KeyCode::Char('b') | KeyCode::Char('B') => app.open_boxrec_editor(),
+            KeyCode::Char('f') | KeyCode::Char('F') | KeyCode::Char('s') | KeyCode::Char('S') => {
+                app.open_finish_match_modal();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                if app.selected_match_idx > 0 {
+                    app.selected_match_idx -= 1;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if app.selected_match_idx + 1 < app.matches.len() {
+                    app.selected_match_idx += 1;
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(m) = app.matches.get(app.selected_match_idx).cloned() {
+                    app.start_scoring_match(m);
+                } else {
+                    app.open_new_match_form();
+                }
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete => {
+                if let Some(m) = app.matches.get(app.selected_match_idx) {
+                    let id = m.id;
+                    let title = m.title();
+                    if app.service.delete_match(id).is_ok() {
+                        app.reload_matches();
+                        app.status_message = format!("Deleted match: {}", title);
+                    }
+                }
+            }
+            _ => {}
+        },
+        Screen::NewMatch => match code {
+            KeyCode::Esc => {
+                app.screen = Screen::Home;
+                app.status_message = "Cancelled new match creation.".to_string();
+            }
+            KeyCode::Tab | KeyCode::Down => {
+                app.form_field = app.form_field.next();
+            }
+            KeyCode::BackTab | KeyCode::Up => {
+                app.form_field = app.form_field.prev();
+            }
+            KeyCode::Enter => {
+                app.submit_new_match();
+            }
+            KeyCode::Left if app.form_field == FormField::Rounds => {
+                if app.input_rounds > 1 {
+                    app.input_rounds -= 1;
+                }
+            }
+            KeyCode::Right if app.form_field == FormField::Rounds => {
+                if app.input_rounds < 15 {
+                    app.input_rounds += 1;
+                }
+            }
+            KeyCode::Backspace => match app.form_field {
+                FormField::FighterA => {
+                    app.input_fighter_a.pop();
+                }
+                FormField::FighterB => {
+                    app.input_fighter_b.pop();
+                }
+                FormField::Date => {
+                    app.input_date.pop();
+                }
+                FormField::Rounds => {}
+            },
+            KeyCode::Char(c) => match app.form_field {
+                FormField::FighterA => app.input_fighter_a.push(c),
+                FormField::FighterB => app.input_fighter_b.push(c),
+                FormField::Date => app.input_date.push(c),
+                FormField::Rounds => {
+                    if c == '+' && app.input_rounds < 15 {
+                        app.input_rounds += 1;
+                    } else if c == '-' && app.input_rounds > 1 {
+                        app.input_rounds -= 1;
+                    }
+                }
+            },
+            _ => {}
+        },
+        Screen::EditBoxRec => match code {
+            KeyCode::Esc => {
+                app.screen = app.previous_screen;
+                app.status_message = "Cancelled BoxRec ID update.".to_string();
+            }
+            KeyCode::Tab | KeyCode::BackTab | KeyCode::Up | KeyCode::Down => {
+                app.boxrec_side = match app.boxrec_side {
+                    FighterSide::FighterA => FighterSide::FighterB,
+                    FighterSide::FighterB => FighterSide::FighterA,
+                };
+            }
+            KeyCode::Enter => {
+                app.submit_boxrec_ids();
+            }
+            KeyCode::Backspace => match app.boxrec_side {
+                FighterSide::FighterA => {
+                    app.input_boxrec_a.pop();
+                }
+                FighterSide::FighterB => {
+                    app.input_boxrec_b.pop();
+                }
+            },
+            KeyCode::Char(c) => match app.boxrec_side {
+                FighterSide::FighterA => app.input_boxrec_a.push(c),
+                FighterSide::FighterB => app.input_boxrec_b.push(c),
+            },
+            _ => {}
+        },
+        Screen::FinishMatch => match code {
+            KeyCode::Esc => {
+                app.screen = app.previous_screen;
+                app.status_message = "Cancelled stoppage / finish.".to_string();
+            }
+            KeyCode::Tab | KeyCode::Down => {
+                app.finish_field = app.finish_field.next();
+            }
+            KeyCode::BackTab | KeyCode::Up => {
+                app.finish_field = app.finish_field.prev();
+            }
+            KeyCode::Left => match app.finish_field {
+                FinishField::Method => app.finish_method = app.finish_method.prev(),
+                FinishField::Winner => app.cycle_finish_winner_prev(),
+                FinishField::Round => {
+                    if app.finish_round > 1 {
+                        app.finish_round -= 1;
+                    }
+                }
+            },
+            KeyCode::Right => match app.finish_field {
+                FinishField::Method => app.finish_method = app.finish_method.next(),
+                FinishField::Winner => app.cycle_finish_winner_next(),
+                FinishField::Round => {
+                    if app.finish_round < app.finish_max_rounds {
+                        app.finish_round += 1;
+                    }
+                }
+            },
+            KeyCode::Enter => {
+                app.submit_finish_match();
+            }
+            _ => {}
+        },
+        Screen::Scoring => match code {
+            KeyCode::Esc | KeyCode::Char('m') | KeyCode::Char('M') => {
+                app.screen = Screen::Home;
+                app.reload_matches();
+                app.status_message = "Returned to match list.".to_string();
+            }
+            KeyCode::Char('q') | KeyCode::Char('Q') => app.should_quit = true,
+
+            // Deduct point from Fighter A
+            KeyCode::Char('1') | KeyCode::Left | KeyCode::Char('a') => {
+                app.deduct_point(FighterSide::FighterA);
+            }
+            // Restore point to Fighter A
+            KeyCode::Char('!') | KeyCode::Char('A') | KeyCode::Char('w') | KeyCode::Char('W') => {
+                app.restore_point(FighterSide::FighterA);
+            }
+
+            // Deduct point from Fighter B
+            KeyCode::Char('2') | KeyCode::Right | KeyCode::Char('d') => {
+                app.deduct_point(FighterSide::FighterB);
+            }
+            // Restore point to Fighter B
+            KeyCode::Char('@') | KeyCode::Char('D') | KeyCode::Char('e') | KeyCode::Char('E') => {
+                app.restore_point(FighterSide::FighterB);
+            }
+
+            // Lock round in
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                app.lock_current_round();
+            }
+
+            // Undo last locked round (or step back to Walkout)
+            KeyCode::Char('u') | KeyCode::Char('U') => {
+                app.undo_last_locked_round();
+            }
+
+            // Jump directly to Pre-Fight Walkout scoring
+            KeyCode::Char('0') => {
+                app.open_walkout_stage();
+            }
+
+            // Open optional BoxRec ID editor after the fact
+            KeyCode::Char('b') | KeyCode::Char('B') => {
+                app.open_boxrec_editor();
+            }
+
+            // Record Stoppage (TKO, Towel/RTD, KO, DQ) or Mark Fight Complete
+            KeyCode::Char('f') | KeyCode::Char('F') | KeyCode::Char('s') | KeyCode::Char('S') => {
+                app.open_finish_match_modal();
+            }
+
+            // Timer controls
+            KeyCode::Char('p') | KeyCode::Char('P') => {
+                if let Some(ref mut timer) = app.timer {
+                    timer.toggle_pause();
+                    app.status_message = if timer.paused {
+                        "Timer paused.".to_string()
+                    } else {
+                        "Timer resumed.".to_string()
+                    };
+                }
+            }
+            KeyCode::Char('t') | KeyCode::Char('T') => {
+                if let Some(ref mut timer) = app.timer {
+                    if let Some(prompt) = timer.skip_phase() {
+                        app.status_message = prompt.message();
+                        app.alert_until = Some(Instant::now() + Duration::from_secs(3));
+                    }
+                }
+            }
+            _ => {}
+        },
+    }
+}

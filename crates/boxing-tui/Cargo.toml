@@ -1,0 +1,17 @@
+[package]
+name = "boxing-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Interactive console (TUI) application for scoring boxing matches"
+
+[[bin]]
+name = "boxing"
+path = "src/main.rs"
+
+[dependencies]
+boxing-core = { path = "../boxing-core" }
+ratatui.workspace = true
+crossterm.workspace = true
+chrono.workspace = true
+uuid.workspace = true

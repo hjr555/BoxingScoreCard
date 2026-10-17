@@ -1,0 +1,13 @@
+[package]
+name = "boxing-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Frontend-agnostic core domain, timer, and storage engine for scoring boxing matches"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
