@@ -204,4 +204,82 @@ mod tests {
         assert_eq!(active.fighter_b_score, 9);
         assert_eq!(m.walkout_score.as_ref().unwrap().fighter_b_score, 8);
     }
+
+    #[test]
+    fn test_v0_1_0_matches_json_backwards_compatibility() {
+        // Snapshot of the v0.1.0 matches.json schema (both in-progress and finished matches)
+        // Future versions must always be able to deserialize this format without data loss.
+        let v0_1_0_json = r#"[
+  {
+    "id": "60631245-35ba-4a92-ba3f-7c49253bd9a0",
+    "fighter_a": "Daniel Dubois",
+    "fighter_b": "Fabio Wardley",
+    "date": "2026-10-17",
+    "scheduled_rounds": 12,
+    "round_duration_secs": 180,
+    "break_duration_secs": 60,
+    "walkout_score": {
+      "round_number": 0,
+      "fighter_a_score": 9,
+      "fighter_b_score": 10
+    },
+    "locked_rounds": [
+      {
+        "round_number": 1,
+        "fighter_a_score": 10,
+        "fighter_b_score": 9
+      }
+    ],
+    "active_round": {
+      "round_number": 2,
+      "fighter_a_score": 10,
+      "fighter_b_score": 9
+    }
+  },
+  {
+    "id": "11111111-2222-3333-4444-555555555555",
+    "fighter_a": "Oleksandr Usyk",
+    "fighter_b": "Tyson Fury",
+    "fighter_a_boxrec_id": "659772",
+    "fighter_b_boxrec_id": "479205",
+    "date": "2024-05-18",
+    "scheduled_rounds": 12,
+    "round_duration_secs": 180,
+    "break_duration_secs": 60,
+    "walkout_score": null,
+    "locked_rounds": [
+      {
+        "round_number": 1,
+        "fighter_a_score": 10,
+        "fighter_b_score": 9
+      }
+    ],
+    "active_round": null,
+    "outcome": {
+      "method": "decision",
+      "winner": "fighter_a",
+      "round": 12
+    }
+  }
+]"#;
+
+        let matches: Vec<BoxingMatch> =
+            serde_json::from_str(v0_1_0_json).expect("v0.1.0 matches.json must deserialize");
+        assert_eq!(matches.len(), 2);
+
+        let m1 = &matches[0];
+        assert_eq!(m1.fighter_a, "Daniel Dubois");
+        assert_eq!(m1.fighter_b, "Fabio Wardley");
+        assert_eq!(m1.total_scores(), (10, 9));
+        assert_eq!(m1.active_round.as_ref().unwrap().round_number, 2);
+        assert!(!m1.is_complete());
+
+        let m2 = &matches[1];
+        assert_eq!(m2.boxrec_id(FighterSide::FighterA), Some("659772"));
+        assert!(m2.is_complete());
+        assert_eq!(
+            m2.outcome_summary().as_deref(),
+            Some("Oleksandr Usyk (DEC)")
+        );
+    }
 }

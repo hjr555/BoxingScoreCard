@@ -152,6 +152,18 @@ impl ActiveRound {
     }
 }
 
+fn default_scheduled_rounds() -> u8 {
+    DEFAULT_SCHEDULED_ROUNDS
+}
+
+fn default_round_duration_secs() -> u32 {
+    DEFAULT_ROUND_DURATION_SECS
+}
+
+fn default_break_duration_secs() -> u32 {
+    DEFAULT_BREAK_DURATION_SECS
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BoxingMatch {
     pub id: Uuid,
@@ -162,12 +174,17 @@ pub struct BoxingMatch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fighter_b_boxrec_id: Option<String>,
     pub date: NaiveDate,
+    #[serde(default = "default_scheduled_rounds")]
     pub scheduled_rounds: u8,
+    #[serde(default = "default_round_duration_secs")]
     pub round_duration_secs: u32,
+    #[serde(default = "default_break_duration_secs")]
     pub break_duration_secs: u32,
     #[serde(default)]
     pub walkout_score: Option<RoundScore>,
+    #[serde(default)]
     pub locked_rounds: Vec<RoundScore>,
+    #[serde(default)]
     pub active_round: Option<ActiveRound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outcome: Option<MatchOutcome>,

@@ -31,9 +31,13 @@ fn main() -> io::Result<()> {
                 json_path = PathBuf::from(&args[idx + 1]);
                 idx += 2;
             }
+            "--version" | "-V" => {
+                println!("boxing {}", env!("CARGO_PKG_VERSION"));
+                return Ok(());
+            }
             "--help" | "-h" => {
-                println!("Boxing Scorecard");
-                println!("Usage: boxing [--file <matches.json>]");
+                println!("Boxing Scorecard v{}", env!("CARGO_PKG_VERSION"));
+                println!("Usage: boxing [--file <matches.json>] [--version]");
                 return Ok(());
             }
             _ => {
