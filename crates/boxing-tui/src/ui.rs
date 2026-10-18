@@ -4,7 +4,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph, Row, Table},
+    widgets::{
+        Block, Borders, Clear, Gauge, List, ListItem, ListState, Paragraph, Row, Table, TableState,
+    },
     Frame,
 };
 
@@ -47,22 +49,19 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         ])
         .split(f.area());
 
-    let title = Paragraph::new(Line::from(vec![
-        Span::styled(
-            " 🥊 BOXING SCORECARD ",
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw("  Minimal-Input Round-by-Round Match Scorer"),
-    ]))
+    let title = Paragraph::new(Line::from(vec![Span::styled(
+        " 🥊 BOXING SCORECARD ",
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )]))
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
     let items: Vec<ListItem> = if app.matches.is_empty() {
         vec![ListItem::new(Line::from(Span::styled(
-            "  No saved matches yet. Press [N] or [Enter] to create a new match!",
+            "  No matches yet — [N]ew match",
             Style::default().fg(Color::DarkGray),
         )))]
     } else {
@@ -93,7 +92,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                     None => m.fighter_b.clone(),
                 };
                 let line = format!(
-                    " {:<32} | {:<22} | {:<13} | Cards: {} {} - {} {}",
+                    " {:<32} | {:<22} | {:<13} | {} {} - {} {}",
                     m.title(),
                     status,
                     walkout_info,
@@ -118,11 +117,15 @@ fn draw_home(f: &mut Frame, app: &mut App) {
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Saved Matches (JSON Backend) — [↑/↓] or [J/K] Select "),
+            .title(" Matches "),
     );
-    f.render_widget(list, chunks[1]);
+    let mut list_state = ListState::default();
+    if !app.matches.is_empty() {
+        list_state.select(Some(app.selected_match_idx));
+    }
+    f.render_stateful_widget(list, chunks[1], &mut list_state);
 
-    let btn = Paragraph::new(" [ + NEW MATCH (Press N) ] ")
+    let btn = Paragraph::new(" + [N]ew Match ")
         .alignment(Alignment::Center)
         .style(
             Style::default()
@@ -134,7 +137,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
     f.render_widget(btn, chunks[2]);
 
     let footer = Paragraph::new(format!(
-        " {}  |  [N] New  [Enter] Open  [F] Stoppage/Finish  [B] BoxRec IDs  [D] Delete  [Q] Quit",
+        " {}  |  [N]ew  [Enter] Open  [F]inish  [B]oxRec  [D]elete  [Q]uit",
         app.status_message
     ))
     .style(Style::default().fg(Color::Gray));
@@ -142,11 +145,11 @@ fn draw_home(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_new_match_modal(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(65, 65, f.area());
+    let area = centered_rect(60, 62, f.area());
     f.render_widget(Clear, area);
 
     let block = Block::default()
-        .title(" Create New Boxing Match ")
+        .title(" New Match ")
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::Black).fg(Color::White));
     f.render_widget(block, area);
@@ -193,50 +196,40 @@ fn draw_new_match_modal(f: &mut Frame, app: &mut App) {
     let dt = Paragraph::new(app.input_date.as_str()).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Match Date (e.g. 01 Jan 2026) ")
+            .title(" Date ")
             .border_style(field_style(FormField::Date)),
     );
     f.render_widget(dt, inner[2]);
 
-    let rds = Paragraph::new(format!(
-        "{} rounds (Use [←/→] or [-/+] to adjust)",
-        app.input_rounds
-    ))
-    .block(
+    let rds = Paragraph::new(format!("{}  [←/→]", app.input_rounds)).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Scheduled Rounds ")
+            .title(" Rounds ")
             .border_style(field_style(FormField::Rounds)),
     );
     f.render_widget(rds, inner[3]);
 
-    let preview = Paragraph::new(Line::from(vec![
-        Span::styled("Formatted Title: ", Style::default().fg(Color::Gray)),
-        Span::styled(
-            app.preview_title(),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ]))
-    .block(Block::default().borders(Borders::ALL).title(" Preview "));
+    let preview = Paragraph::new(Line::from(vec![Span::styled(
+        app.preview_title(),
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    )]))
+    .block(Block::default().borders(Borders::ALL).title(" Match "));
     f.render_widget(preview, inner[4]);
 
-    let help = Paragraph::new(" [Tab / ↑ / ↓] Switch Field   [Enter] Start Match   [Esc] Cancel")
+    let help = Paragraph::new("[Tab/↑/↓] Field   [Enter] Start   [Esc] Cancel")
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::Green));
     f.render_widget(help, inner[5]);
 }
 
 fn draw_boxrec_modal(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(60, 48, f.area());
+    let area = centered_rect(56, 45, f.area());
     f.render_widget(Clear, area);
 
     let block = Block::default()
-        .title(format!(
-            " Optional BoxRec IDs — {} ",
-            app.boxrec_target_title
-        ))
+        .title(format!(" BoxRec IDs — {} ", app.boxrec_target_title))
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::Black).fg(Color::White));
     f.render_widget(block, area);
@@ -269,10 +262,7 @@ fn draw_boxrec_modal(f: &mut Frame, app: &mut App) {
     let fa_boxrec = Paragraph::new(app.input_boxrec_a.as_str()).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(
-                " {} — BoxRec ID (e.g. 659461, leave blank to clear) ",
-                app.boxrec_fighter_a_name
-            ))
+            .title(format!(" {} ", app.boxrec_fighter_a_name))
             .border_style(style_a),
     );
     f.render_widget(fa_boxrec, inner[0]);
@@ -280,30 +270,25 @@ fn draw_boxrec_modal(f: &mut Frame, app: &mut App) {
     let fb_boxrec = Paragraph::new(app.input_boxrec_b.as_str()).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(format!(
-                " {} — BoxRec ID (e.g. 479205, leave blank to clear) ",
-                app.boxrec_fighter_b_name
-            ))
+            .title(format!(" {} ", app.boxrec_fighter_b_name))
             .border_style(style_b),
     );
     f.render_widget(fb_boxrec, inner[1]);
 
-    let help = Paragraph::new(" [Tab / ↑ / ↓] Switch Fighter   [Enter] Save IDs   [Esc] Cancel")
+    let help = Paragraph::new("[Tab/↑/↓] Switch   [Enter] Save   [Esc] Cancel")
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::Green));
     f.render_widget(help, inner[2]);
 }
 
 fn draw_finish_match_modal(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(65, 58, f.area());
+    let area = centered_rect(68, 65, f.area());
     f.render_widget(Clear, area);
 
     let block = Block::default()
-        .title(format!(
-            " Stoppage / Complete Fight — {} ",
-            app.finish_target_title
-        ))
+        .title(format!(" Finish Match — {} ", app.finish_target_title))
         .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::LightRed))
         .style(Style::default().bg(Color::Black).fg(Color::White));
     f.render_widget(block, area);
 
@@ -311,6 +296,7 @@ fn draw_finish_match_modal(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .margin(2)
         .constraints([
+            Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
@@ -329,49 +315,63 @@ fn draw_finish_match_modal(f: &mut Frame, app: &mut App) {
     };
 
     let method_text = format!(
-        "◄  {}  ►   (Use [←/→] to change)",
+        "◄  {}  ►   |  [T]KO  [K]O  [R]TD  [Q] DQ  [D]ec/TD",
         app.finish_method.description()
     );
     let method_box = Paragraph::new(method_text).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" 1. How Did the Fight End? (TKO / Towel RTD / KO / DQ / Decision) ")
+            .title(" Method [←/→] ")
             .border_style(field_style(FinishField::Method)),
     );
     f.render_widget(method_box, inner[0]);
 
     let winner_name = match app.finish_winner {
-        Some(FighterSide::FighterA) => format!("{} (Red Corner)", app.finish_fighter_a_name),
-        Some(FighterSide::FighterB) => format!("{} (Blue Corner)", app.finish_fighter_b_name),
-        None => "Draw / Scorecard Only".to_string(),
+        Some(FighterSide::FighterA) => format!("{} (Red)", app.finish_fighter_a_name),
+        Some(FighterSide::FighterB) => format!("{} (Blue)", app.finish_fighter_b_name),
+        None => "Draw".to_string(),
     };
-    let winner_text = format!("◄  {}  ►   (Use [←/→] to change)", winner_name);
+    let winner_text = format!(
+        "◄  {}  ►   |  [1] {}  [2] {}  [0] Draw",
+        winner_name, app.finish_fighter_a_name, app.finish_fighter_b_name
+    );
     let winner_box = Paragraph::new(winner_text).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" 2. Winner ")
+            .title(" Winner [←/→] ")
             .border_style(field_style(FinishField::Winner)),
     );
     f.render_widget(winner_box, inner[1]);
 
     let round_text = format!(
-        "◄  Round {} of {}  ►   (Use [←/→] to change)",
+        "◄  Round {} of {}  ►   |  [-/+] Round",
         app.finish_round, app.finish_max_rounds
     );
     let round_box = Paragraph::new(round_text).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" 3. Ended in Round ")
+            .title(" Round [←/→] ")
             .border_style(field_style(FinishField::Round)),
     );
     f.render_widget(round_box, inner[2]);
 
-    let help = Paragraph::new(
-        " [Tab / ↑ / ↓] Switch Field   [← / →] Change Value   [Enter] Mark Fight Complete   [Esc] Cancel",
-    )
-    .alignment(Alignment::Center)
-    .style(Style::default().fg(Color::Green));
-    f.render_widget(help, inner[3]);
+    let preview = Paragraph::new(Line::from(vec![
+        Span::styled(
+            format!(" 🏆 {} ", app.preview_finish_outcome()),
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(format!("   |   Cards: {}", app.finish_cards_summary)),
+    ]))
+    .block(Block::default().borders(Borders::ALL).title(" Result "));
+    f.render_widget(preview, inner[3]);
+
+    let help = Paragraph::new("[Enter] Confirm   [Tab/↑/↓] Field   [Esc] Cancel")
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
+    f.render_widget(help, inner[4]);
 }
 
 fn draw_scoring(f: &mut Frame, app: &mut App) {
@@ -383,15 +383,15 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(3), // Match Title Header
-            Constraint::Length(4), // Loose Timer & Alert Banner
+            Constraint::Length(3), // Match Header
+            Constraint::Length(4), // Timer Banner
             Constraint::Min(10),   // Fighter Cards + Scorecard Table
-            Constraint::Length(3), // Bottom LOCK ROUND IN Button
+            Constraint::Length(3), // Action Bar
             Constraint::Length(2), // Status & Controls Bar
         ])
         .split(f.area());
 
-    // 1. Header: Match Title `Joshua v Fury (01 Jan 2026)` & Running Total
+    // 1. Header
     let (tot_a, tot_b) = m.total_scores();
     let is_walkout_stage = m
         .active_round
@@ -403,15 +403,12 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         (format!("🏆 FINAL: {}", summary), Color::Green)
     } else {
         match &m.active_round {
-            Some(active) if active.is_walkout() => (
-                "🎵 PRE-FIGHT WALKOUT (FUN ROUND)".to_string(),
-                Color::Magenta,
-            ),
+            Some(active) if active.is_walkout() => ("🎵 WALKOUT".to_string(), Color::Magenta),
             Some(active) => (
-                format!("ROUND {} OF {}", active.round_number, m.scheduled_rounds),
+                format!("ROUND {} / {}", active.round_number, m.scheduled_rounds),
                 Color::Blue,
             ),
-            None => ("FINAL SCORECARD (COMPLETE)".to_string(), Color::DarkGray),
+            None => ("FINAL".to_string(), Color::DarkGray),
         }
     };
 
@@ -436,14 +433,14 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw(format!(
-            "   Official Fight Score: {} {} - {} {}",
+            "   Score: {} {} - {} {}",
             m.fighter_a, tot_a, tot_b, m.fighter_b
         )),
     ]))
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(header, root[0]);
 
-    // 2. Timer Banner (Loose prompts for round starts and breaks)
+    // 2. Timer Banner
     if let Some(ref timer) = app.timer {
         let total_dur = match timer.phase {
             TimerPhase::InRound { .. } | TimerPhase::Ready { .. } => {
@@ -481,26 +478,37 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
             .map(|p| p.message())
             .unwrap_or_else(|| {
                 if let Some(summary) = m.outcome_summary() {
-                    format!("Fight Complete — {}", summary)
+                    summary
                 } else if is_walkout_stage {
-                    "Score the pre-fight walkout! Round 1 timer starts when locked in.".to_string()
+                    "Walkout".to_string()
                 } else {
                     String::new()
                 }
             });
 
-        let label = format!(
-            "{} — {}{}  |  {}",
-            timer.phase_label(),
-            timer.formatted_remaining(),
-            pause_tag,
-            prompt_text
-        );
+        let label = if prompt_text.is_empty() {
+            format!(
+                "{} — {}{}",
+                timer.phase_label(),
+                timer.formatted_remaining(),
+                pause_tag
+            )
+        } else {
+            format!(
+                "{} — {}{}  |  {}",
+                timer.phase_label(),
+                timer.formatted_remaining(),
+                pause_tag,
+                prompt_text
+            )
+        };
 
         let gauge = Gauge::default()
-            .block(Block::default().borders(Borders::ALL).title(
-                " Match Timer (Loose Prompt — [P] Pause/Resume, [T] Next Phase, [F] Stoppage/Finish) ",
-            ))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Timer — [P]ause  [T] Next Phase "),
+            )
             .gauge_style(
                 Style::default()
                     .fg(bar_color)
@@ -512,7 +520,7 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         f.render_widget(gauge, root[1]);
     }
 
-    // 3. Main Area: Left/Center Fighter Score Cards + Right Round-by-Round Scorecard
+    // 3. Main Area: Fighter Score Cards + Scorecard Table
     let main_split = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(68), Constraint::Percentage(32)])
@@ -530,11 +538,11 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         .unwrap_or((0, 0));
 
     let points_caption = if is_walkout_stage {
-        "🎵 WALKOUT POINTS (FUN)"
+        "WALKOUT"
     } else if m.active_round.is_some() {
-        "POINTS THIS ROUND"
+        "ROUND SCORE"
     } else {
-        "MATCH COMPLETE"
+        "FINAL"
     };
 
     draw_fighter_card(
@@ -546,7 +554,7 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         m.active_round.is_some(),
         points_caption,
         Color::LightRed,
-        "Deduct (-1): [1] / [←] / [A]   |   Restore (+1): [!] / [W]",
+        "[-1] 1 / ← / A   [+1] ! / W",
     );
 
     draw_fighter_card(
@@ -558,67 +566,84 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         m.active_round.is_some(),
         points_caption,
         Color::LightBlue,
-        "Deduct (-1): [2] / [→] / [D]   |   Restore (+1): [@] / [E]",
+        "[-1] 2 / → / D   [+1] @ / E",
     );
 
-    // Scorecard Table on the right
     draw_scorecard_table(f, main_split[1], m);
 
-    // 4. Bottom Button: Lock the Walkout or Round In
-    let (btn_text, btn_style) = match &m.active_round {
-        Some(active) if active.is_walkout() => (
-            format!(
-                " 🎵 LOCK WALKOUT SCORE IN ({} {} - {} {}) & START ROUND 1 — [Press Enter or Space] ",
-                m.fighter_a,
-                active.fighter_a_score,
-                active.fighter_b_score,
-                m.fighter_b
-            ),
-            Style::default()
-                .fg(Color::White)
-                .bg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Some(active) => (
-            format!(
-                " 🔒 LOCK ROUND {} IN ({} {} - {} {}) — [Enter/Space]   |   🛑 STOPPAGE / FINISH FIGHT — [Press F] ",
-                active.round_number,
-                m.fighter_a,
-                active.fighter_a_score,
-                active.fighter_b_score,
-                m.fighter_b
-            ),
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
+    // 4. Bottom Action Bar
+    match &m.active_round {
+        Some(active) => {
+            let action_split = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(54),
+                    Constraint::Length(1),
+                    Constraint::Percentage(45),
+                ])
+                .split(root[3]);
+
+            let (lock_text, lock_style) = if active.is_walkout() {
+                (
+                    format!(
+                        " [Enter] Lock Walkout ({}-{}) ",
+                        active.fighter_a_score, active.fighter_b_score
+                    ),
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                )
+            } else {
+                (
+                    format!(
+                        " [Enter] Lock Round {} ({}-{}) ",
+                        active.round_number, active.fighter_a_score, active.fighter_b_score
+                    ),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )
+            };
+
+            let lock_btn = Paragraph::new(lock_text)
+                .alignment(Alignment::Center)
+                .style(lock_style);
+            f.render_widget(lock_btn, action_split[0]);
+
+            let stop_btn = Paragraph::new(" [F]inish Fight ([K]O / [R]TD) ")
+                .alignment(Alignment::Center)
+                .style(
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
+                );
+            f.render_widget(stop_btn, action_split[2]);
+        }
         None => {
             let summary = m
                 .outcome_summary()
-                .unwrap_or_else(|| "ALL ROUNDS LOCKED".to_string());
-            (
-                format!(
-                    " ✅ MATCH COMPLETE ({}) — [F] Edit Result  [U] Reopen Round  [Esc] Menu ",
-                    summary
-                ),
+                .unwrap_or_else(|| "COMPLETE".to_string());
+            let done_btn = Paragraph::new(format!(
+                " ✅ {}  —  [F]inish  [U]ndo  [Esc] Matches ",
+                summary
+            ))
+            .alignment(Alignment::Center)
+            .style(
                 Style::default()
                     .fg(Color::White)
                     .bg(Color::DarkGray)
                     .add_modifier(Modifier::BOLD),
-            )
+            );
+            f.render_widget(done_btn, root[3]);
         }
-    };
-
-    let lock_btn = Paragraph::new(btn_text)
-        .alignment(Alignment::Center)
-        .style(btn_style)
-        .block(Block::default().borders(Borders::NONE));
-    f.render_widget(lock_btn, root[3]);
+    }
 
     // 5. Status & Help Footer
     let footer = Paragraph::new(format!(
-        " {}  |  [F] Stoppage/Finish  [0] Walkout  [B] BoxRec  [U] Undo  [Esc] Menu",
+        " {}  |  [F]inish  [0] Walkout  [B]oxRec  [U]ndo  [P]ause  [Esc] Matches",
         app.status_message
     ))
     .style(Style::default().fg(Color::Gray));
@@ -638,7 +663,7 @@ fn draw_fighter_card(
     hint: &str,
 ) {
     let title_str = match boxrec_id {
-        Some(id) => format!(" {} (BoxRec: #{}) ", name.to_uppercase(), id),
+        Some(id) => format!(" {} (#{}) ", name.to_uppercase(), id),
         None => format!(" {} ", name.to_uppercase()),
     };
 
@@ -655,7 +680,7 @@ fn draw_fighter_card(
         .constraints([
             Constraint::Length(2),
             Constraint::Min(5),
-            Constraint::Length(2),
+            Constraint::Length(1),
         ])
         .split(inner);
 
@@ -693,16 +718,18 @@ fn draw_fighter_card(
     .alignment(Alignment::Center);
     f.render_widget(big_score, rows[1]);
 
-    let instructions = Paragraph::new(hint)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Gray));
+    let instructions = Paragraph::new(Line::from(Span::styled(
+        hint,
+        Style::default().fg(Color::Gray),
+    )))
+    .alignment(Alignment::Center);
     f.render_widget(instructions, rows[2]);
 }
 
 fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch) {
     let mut rows: Vec<Row> = Vec::new();
 
-    // Pre-fight Walkout fun row at the very top before Round 1
+    // Walkout row before Round 1
     match &m.walkout_score {
         Some(w) => {
             rows.push(
@@ -758,6 +785,23 @@ fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch)
         );
     }
 
+    if let Some(active) = &m.active_round {
+        if !active.is_walkout() {
+            rows.push(
+                Row::new(vec![
+                    format!("▶ R{}", active.round_number),
+                    format!("{}*", active.fighter_a_score),
+                    format!("{}*", active.fighter_b_score),
+                ])
+                .style(
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            );
+        }
+    }
+
     if let Some(out) = &m.outcome {
         let (col_a, col_b) = match out.winner {
             Some(FighterSide::FighterA) => (
@@ -796,6 +840,7 @@ fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch)
         ),
     );
 
+    let row_count = rows.len();
     let table = Table::new(
         rows,
         [
@@ -805,7 +850,7 @@ fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch)
         ],
     )
     .header(
-        Row::new(vec!["Stage", &m.fighter_a, &m.fighter_b]).style(
+        Row::new(vec!["Round", &m.fighter_a, &m.fighter_b]).style(
             Style::default()
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
@@ -814,10 +859,15 @@ fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch)
     .block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Scorecard (Walkout + Official) "),
+            .title(" Scorecard "),
     );
 
-    f.render_widget(table, area);
+    // Keep the bottom of the scorecard (latest rounds, Result, and TOTAL) visible on small terminals
+    let mut table_state = TableState::default();
+    if row_count > 0 {
+        table_state.select(Some(row_count - 1));
+    }
+    f.render_stateful_widget(table, area, &mut table_state);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

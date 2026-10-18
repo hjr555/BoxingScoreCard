@@ -46,7 +46,9 @@ impl JsonMatchRepository {
             }
         }
         let json = serde_json::to_string_pretty(matches)?;
-        fs::write(&self.file_path, json)?;
+        let tmp_path = self.file_path.with_extension("json.tmp");
+        fs::write(&tmp_path, json)?;
+        fs::rename(&tmp_path, &self.file_path)?;
         Ok(())
     }
 }

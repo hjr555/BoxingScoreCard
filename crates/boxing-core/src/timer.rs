@@ -17,36 +17,60 @@ pub enum TimerPhase {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum TimerPrompt {
-    RoundStarted { round: u8 },
-    TenSecondWarning { phase: TimerPhase },
-    BreakStarted { after_round: u8, next_round: u8 },
-    FinalBell { final_round: u8 },
+    RoundStarted {
+        round: u8,
+    },
+    TenSecondWarning {
+        phase: TimerPhase,
+    },
+    BreakStarted {
+        after_round: u8,
+        next_round: u8,
+        #[serde(default = "default_break_secs")]
+        break_duration_secs: u32,
+    },
+    FinalBell {
+        final_round: u8,
+    },
+}
+
+fn default_break_secs() -> u32 {
+    crate::models::DEFAULT_BREAK_DURATION_SECS
 }
 
 impl TimerPrompt {
     pub fn message(&self) -> String {
         match self {
             TimerPrompt::RoundStarted { round } => {
-                format!("BELL! Round {} has started — score the action!", round)
+                format!("🔔 Round {} started", round)
             }
             TimerPrompt::TenSecondWarning {
                 phase: TimerPhase::InRound { round },
-            } => format!("10 seconds remaining in Round {}! Prepare to lock round.", round),
+            } => format!("⏱ 10s left in Round {}", round),
             TimerPrompt::TenSecondWarning {
                 phase: TimerPhase::InBreak { next_round, .. },
-            } => format!("Seconds out! Round {} starts in 10 seconds.", next_round),
-            TimerPrompt::TenSecondWarning { .. } => "10 seconds remaining!".to_string(),
+            } => format!("⏱ Seconds out — Round {} in 10s", next_round),
+            TimerPrompt::TenSecondWarning { .. } => "⏱ 10s remaining".to_string(),
             TimerPrompt::BreakStarted {
                 after_round,
-                next_round,
-            } => format!(
-                "End of Round {}! 1-minute break before Round {} — remember to lock Round {} in.",
-                after_round, next_round, after_round
-            ),
-            TimerPrompt::FinalBell { final_round } => format!(
-                "FINAL BELL! End of Round {} — lock in your final round score!",
-                final_round
-            ),
+                next_round: _,
+                break_duration_secs,
+            } => {
+                let break_label = if *break_duration_secs == 60 {
+                    "1m break".to_string()
+                } else if *break_duration_secs % 60 == 0 {
+                    format!("{}m break", break_duration_secs / 60)
+                } else {
+                    format!("{}s break", break_duration_secs)
+                };
+                format!(
+                    "🔔 End of R{} — {} ([Enter] Lock R{})",
+                    after_round, break_label, after_round
+                )
+            }
+            TimerPrompt::FinalBell { final_round } => {
+                format!("🔔 Final Bell! [Enter] Lock R{}", final_round)
+            }
         }
     }
 }
@@ -81,14 +105,20 @@ impl MatchTimer {
         }
     }
 
+    /// Synchronizes the timer to the start of a specific official round (`1..=scheduled_rounds`).
+    pub fn sync_to_round(&mut self, round: u8) {
+        let clamped = round.clamp(1, self.scheduled_rounds);
+        self.phase = TimerPhase::InRound { round: clamped };
+        self.remaining = self.round_duration;
+        self.ten_sec_warned = false;
+        self.last_prompt = Some(TimerPrompt::RoundStarted { round: clamped });
+    }
+
     /// Starts or resumes the timer.
     pub fn toggle_pause(&mut self) {
         if let TimerPhase::Ready { next_round } = self.phase {
-            self.phase = TimerPhase::InRound { round: next_round };
-            self.remaining = self.round_duration;
+            self.sync_to_round(next_round);
             self.paused = false;
-            self.ten_sec_warned = false;
-            self.last_prompt = Some(TimerPrompt::RoundStarted { round: next_round });
         } else if self.phase != TimerPhase::Completed {
             self.paused = !self.paused;
         }
@@ -116,16 +146,18 @@ impl MatchTimer {
                     }
                     None
                 } else if round < self.scheduled_rounds {
+                    let overflow = delta.saturating_sub(self.remaining);
                     let next_round = round + 1;
                     self.phase = TimerPhase::InBreak {
                         after_round: round,
                         next_round,
                     };
-                    self.remaining = self.break_duration;
+                    self.remaining = self.break_duration.saturating_sub(overflow);
                     self.ten_sec_warned = false;
                     let prompt = TimerPrompt::BreakStarted {
                         after_round: round,
                         next_round,
+                        break_duration_secs: self.break_duration.as_secs() as u32,
                     };
                     self.last_prompt = Some(prompt.clone());
                     Some(prompt)
@@ -152,8 +184,9 @@ impl MatchTimer {
                     }
                     None
                 } else {
+                    let overflow = delta.saturating_sub(self.remaining);
                     self.phase = TimerPhase::InRound { round: next_round };
-                    self.remaining = self.round_duration;
+                    self.remaining = self.round_duration.saturating_sub(overflow);
                     self.ten_sec_warned = false;
                     let prompt = TimerPrompt::RoundStarted { round: next_round };
                     self.last_prompt = Some(prompt.clone());
@@ -165,10 +198,14 @@ impl MatchTimer {
 
     /// Manually skips to the next timer phase (e.g. from Round to Break, or Break to next Round).
     pub fn skip_phase(&mut self) -> Option<TimerPrompt> {
+        if let TimerPhase::Ready { next_round } = self.phase {
+            self.sync_to_round(next_round);
+            return self.last_prompt.clone();
+        }
         let remaining = self.remaining;
         let was_paused = self.paused;
         self.paused = false;
-        let prompt = self.tick(remaining + Duration::from_millis(1));
+        let prompt = self.tick(remaining);
         self.paused = was_paused;
         prompt
     }
@@ -184,12 +221,12 @@ impl MatchTimer {
     /// Returns a human-readable label for the current timer phase.
     pub fn phase_label(&self) -> String {
         match self.phase {
-            TimerPhase::Ready { next_round } => format!("READY (ROUND {})", next_round),
-            TimerPhase::InRound { round } => format!("ROUND {} IN PROGRESS", round),
+            TimerPhase::Ready { next_round } => format!("READY (R{})", next_round),
+            TimerPhase::InRound { round } => format!("ROUND {}", round),
             TimerPhase::InBreak { next_round, .. } => {
-                format!("BREAK (NEXT: ROUND {})", next_round)
+                format!("BREAK (NEXT: R{})", next_round)
             }
-            TimerPhase::Completed => "MATCH TIME COMPLETE".to_string(),
+            TimerPhase::Completed => "COMPLETE".to_string(),
         }
     }
 }

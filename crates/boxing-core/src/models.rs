@@ -171,6 +171,8 @@ pub struct BoxingMatch {
     pub active_round: Option<ActiveRound>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outcome: Option<MatchOutcome>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_round: Option<ActiveRound>,
 }
 
 impl BoxingMatch {
@@ -209,6 +211,7 @@ impl BoxingMatch {
             // Start at Round 0 (Pre-Fight Walkout)
             active_round: Some(ActiveRound::new(WALKOUT_ROUND_NUMBER)),
             outcome: None,
+            resume_round: None,
         }
     }
 
@@ -222,23 +225,33 @@ impl BoxingMatch {
         )
     }
 
-    /// Returns a human-readable summary of the match outcome if finished (e.g. `Dubois TKO R5`).
+    /// Returns a human-readable summary of the match outcome if finished (e.g. `Dubois by TKO (R5)`).
     pub fn outcome_summary(&self) -> Option<String> {
         let out = self.outcome.as_ref()?;
-        let winner_name = match out.winner {
-            Some(FighterSide::FighterA) => self.fighter_a.as_str(),
-            Some(FighterSide::FighterB) => self.fighter_b.as_str(),
-            None => "Draw / Scorecard",
-        };
-        if out.method == FinishMethod::Decision {
-            Some(format!("{} ({})", winner_name, out.method.short_label()))
-        } else {
-            Some(format!(
-                "{} by {} (R{})",
-                winner_name,
-                out.method.short_label(),
-                out.round
-            ))
+        match out.winner {
+            Some(side) => {
+                let winner_name = match side {
+                    FighterSide::FighterA => self.fighter_a.as_str(),
+                    FighterSide::FighterB => self.fighter_b.as_str(),
+                };
+                if out.method == FinishMethod::Decision {
+                    Some(format!("{} ({})", winner_name, out.method.short_label()))
+                } else {
+                    Some(format!(
+                        "{} by {} (R{})",
+                        winner_name,
+                        out.method.short_label(),
+                        out.round
+                    ))
+                }
+            }
+            None => {
+                if out.method == FinishMethod::Decision {
+                    Some(format!("Draw ({})", out.method.short_label()))
+                } else {
+                    Some(format!("Draw ({} R{})", out.method.short_label(), out.round))
+                }
+            }
         }
     }
 
@@ -282,14 +295,19 @@ impl BoxingMatch {
         }
     }
 
-    /// Opens or re-opens the Pre-Fight Walkout (`round_number == 0`) for scoring.
+    /// Opens or re-opens the Pre-Fight Walkout (`round_number == 0`) for scoring,
+    /// preserving any in-progress official round or completed outcome.
     pub fn open_walkout(&mut self) {
+        if let Some(current) = self.active_round.take() {
+            if !current.is_walkout() {
+                self.resume_round = Some(current);
+            }
+        }
         let (a, b) = self
             .walkout_score
             .take()
             .map(|w| (w.fighter_a_score, w.fighter_b_score))
             .unwrap_or((DEFAULT_INITIAL_POINTS, DEFAULT_INITIAL_POINTS));
-        self.outcome = None;
         self.active_round = Some(ActiveRound {
             round_number: WALKOUT_ROUND_NUMBER,
             fighter_a_score: a,
@@ -319,8 +337,15 @@ impl BoxingMatch {
 
         if active.is_walkout() {
             self.walkout_score = Some(locked.clone());
-            self.active_round = self.next_unlocked_round_number().map(ActiveRound::new);
+            if self.outcome.is_some() {
+                self.active_round = None;
+            } else if let Some(resumed) = self.resume_round.take() {
+                self.active_round = Some(resumed);
+            } else {
+                self.active_round = self.next_unlocked_round_number().map(ActiveRound::new);
+            }
         } else {
+            self.resume_round = None;
             self.locked_rounds.push(locked.clone());
             self.active_round = self.next_unlocked_round_number().map(ActiveRound::new);
             if self.active_round.is_none() && self.outcome.is_none() {
@@ -346,15 +371,47 @@ impl BoxingMatch {
     /// Marks the fight as complete (e.g. via TKO/referee stoppage, RTD/towel thrown in, KO, or Decision).
     /// Clears `active_round` so the match is permanently marked complete and will not restart the timer.
     pub fn finish_match(&mut self, outcome: MatchOutcome) {
+        if let Some(active) = self.active_round.take() {
+            if active.is_walkout() {
+                self.walkout_score = Some(RoundScore {
+                    round_number: WALKOUT_ROUND_NUMBER,
+                    fighter_a_score: active.fighter_a_score,
+                    fighter_b_score: active.fighter_b_score,
+                });
+            } else {
+                self.resume_round = Some(active);
+            }
+        }
         self.outcome = Some(outcome);
-        self.active_round = None;
     }
 
     /// Undoes a stoppage/completion or the last locked round (or steps back from Round 1 into Walkout).
     pub fn undo_last_round(&mut self) -> bool {
-        // If the match was finished early (before all scheduled rounds were locked), reopen the next unlocked round
+        // If we opened walkout mid-match, undo returns to the resumed round (or completed state)
+        if self
+            .active_round
+            .as_ref()
+            .map(|r| r.is_walkout())
+            .unwrap_or(false)
+        {
+            if let Some(resumed) = self.resume_round.take() {
+                self.active_round = Some(resumed);
+                return true;
+            }
+            if self.outcome.is_some() {
+                self.active_round = None;
+                return true;
+            }
+            return false;
+        }
+
+        // If the match was finished early (before all scheduled rounds were locked), reopen the interrupted round
         if self.outcome.is_some() && self.active_round.is_none() {
             self.outcome = None;
+            if let Some(resumed) = self.resume_round.take() {
+                self.active_round = Some(resumed);
+                return true;
+            }
             if let Some(next_round) = self.next_unlocked_round_number() {
                 self.active_round = Some(ActiveRound::new(next_round));
                 return true;
@@ -363,6 +420,7 @@ impl BoxingMatch {
 
         if let Some(last) = self.locked_rounds.pop() {
             self.outcome = None;
+            self.resume_round = None;
             self.active_round = Some(ActiveRound {
                 round_number: last.round_number,
                 fighter_a_score: last.fighter_a_score,
@@ -375,6 +433,8 @@ impl BoxingMatch {
             .map(|r| !r.is_walkout())
             .unwrap_or(true)
         {
+            self.outcome = None;
+            self.resume_round = None;
             self.open_walkout();
             true
         } else {
@@ -392,6 +452,6 @@ impl BoxingMatch {
 
     /// Returns true if the match is marked complete (either via stoppage/outcome or all scheduled rounds locked).
     pub fn is_complete(&self) -> bool {
-        self.active_round.is_none() || self.outcome.is_some()
+        self.active_round.is_none()
     }
 }

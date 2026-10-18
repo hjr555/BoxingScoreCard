@@ -1,6 +1,6 @@
 use boxing_core::{
     BoxingMatch, FighterSide, FinishMethod, JsonMatchRepository, MatchOutcome, MatchTimer,
-    ScoringService, TimerPhase, TimerPrompt, DEFAULT_SCHEDULED_ROUNDS,
+    ScoringService, TimerPhase, DEFAULT_SCHEDULED_ROUNDS,
 };
 use chrono::{Local, NaiveDate};
 use std::time::{Duration, Instant};
@@ -79,6 +79,7 @@ pub struct App {
     pub status_message: String,
     pub alert_until: Option<Instant>,
     pub should_quit: bool,
+    pub confirm_delete_id: Option<Uuid>,
 
     // New match form state (minimal, fast: no BoxRec required)
     pub form_field: FormField,
@@ -101,6 +102,7 @@ pub struct App {
     pub finish_target_title: String,
     pub finish_fighter_a_name: String,
     pub finish_fighter_b_name: String,
+    pub finish_cards_summary: String,
     pub finish_max_rounds: u8,
     pub finish_field: FinishField,
     pub finish_method: FinishMethod,
@@ -110,7 +112,13 @@ pub struct App {
 
 impl App {
     pub fn new(service: ScoringService<JsonMatchRepository>) -> Self {
-        let matches = service.list_matches().unwrap_or_default();
+        let (matches, init_status) = match service.list_matches() {
+            Ok(list) => (list, "Ready".to_string()),
+            Err(e) => (
+                Vec::new(),
+                format!("Warning — failed to read matches file: {}", e),
+            ),
+        };
         let today = Local::now().date_naive();
         Self {
             service,
@@ -120,10 +128,10 @@ impl App {
             selected_match_idx: 0,
             current_match: None,
             timer: None,
-            status_message: "Welcome! Press [N] to score a new match, or [Enter] to open selected."
-                .to_string(),
+            status_message: init_status,
             alert_until: None,
             should_quit: false,
+            confirm_delete_id: None,
             form_field: FormField::FighterA,
             input_fighter_a: "Joshua".to_string(),
             input_fighter_b: "Fury".to_string(),
@@ -140,6 +148,7 @@ impl App {
             finish_target_title: String::new(),
             finish_fighter_a_name: String::new(),
             finish_fighter_b_name: String::new(),
+            finish_cards_summary: String::new(),
             finish_max_rounds: DEFAULT_SCHEDULED_ROUNDS,
             finish_field: FinishField::Method,
             finish_method: FinishMethod::Tko,
@@ -149,15 +158,74 @@ impl App {
     }
 
     pub fn reload_matches(&mut self) {
-        if let Ok(list) = self.service.list_matches() {
-            self.matches = list;
-            if self.selected_match_idx >= self.matches.len() && !self.matches.is_empty() {
-                self.selected_match_idx = self.matches.len() - 1;
+        match self.service.list_matches() {
+            Ok(list) => {
+                self.matches = list;
+                if self.selected_match_idx >= self.matches.len() && !self.matches.is_empty() {
+                    self.selected_match_idx = self.matches.len() - 1;
+                }
+            }
+            Err(e) => {
+                self.status_message = format!("Storage error: {}", e);
+                self.alert_until = Some(Instant::now() + Duration::from_secs(4));
             }
         }
     }
 
+    /// Saves `current_match` to disk and updates the in-memory `matches` list without a redundant file read.
+    /// Surfaces any I/O error to `status_message`.
+    fn save_current_match(&mut self) -> bool {
+        let Some(ref m) = self.current_match else {
+            return false;
+        };
+        match self.service.save_match(m) {
+            Ok(()) => {
+                if let Some(existing) = self.matches.iter_mut().find(|item| item.id == m.id) {
+                    *existing = m.clone();
+                } else {
+                    self.matches.push(m.clone());
+                }
+                true
+            }
+            Err(e) => {
+                self.status_message = format!("Save failed: {}", e);
+                self.alert_until = Some(Instant::now() + Duration::from_secs(4));
+                false
+            }
+        }
+    }
+
+    pub fn request_delete_selected_match(&mut self) {
+        let Some(m) = self.matches.get(self.selected_match_idx) else {
+            self.confirm_delete_id = None;
+            return;
+        };
+        let id = m.id;
+        let title = m.title();
+
+        if self.confirm_delete_id == Some(id) {
+            self.confirm_delete_id = None;
+            match self.service.delete_match(id) {
+                Ok(()) => {
+                    self.reload_matches();
+                    self.status_message = format!("Deleted {}", title);
+                }
+                Err(e) => {
+                    self.status_message = format!("Delete failed: {}", e);
+                    self.alert_until = Some(Instant::now() + Duration::from_secs(4));
+                }
+            }
+        } else {
+            self.confirm_delete_id = Some(id);
+            self.status_message = format!(
+                "Delete '{}'? [Y]/[D] Confirm  [Esc] Cancel",
+                title
+            );
+        }
+    }
+
     pub fn open_new_match_form(&mut self) {
+        self.confirm_delete_id = None;
         self.form_field = FormField::FighterA;
         if self.input_fighter_a.is_empty() {
             self.input_fighter_a = "Joshua".to_string();
@@ -169,12 +237,12 @@ impl App {
             self.input_date = Local::now().date_naive().format("%d %b %Y").to_string();
         }
         self.screen = Screen::NewMatch;
-        self.status_message =
-            "Enter match details. [Tab/↑/↓] switch fields, [Enter] start match.".to_string();
+        self.status_message = "New match".to_string();
     }
 
-    /// Opens the optional BoxRec ID modal after the fact for either the active match or selected match.
+    /// Opens the BoxRec ID modal for either the active match or selected match.
     pub fn open_boxrec_editor(&mut self) {
+        self.confirm_delete_id = None;
         let target = match self.screen {
             Screen::Scoring => self.current_match.clone(),
             Screen::Home => self.matches.get(self.selected_match_idx).cloned(),
@@ -182,7 +250,7 @@ impl App {
         };
 
         let Some(m) = target else {
-            self.status_message = "Select or open a match first to add BoxRec IDs.".to_string();
+            self.status_message = "No match selected.".to_string();
             return;
         };
 
@@ -195,8 +263,7 @@ impl App {
         self.input_boxrec_a = m.fighter_a_boxrec_id.unwrap_or_default();
         self.input_boxrec_b = m.fighter_b_boxrec_id.unwrap_or_default();
         self.screen = Screen::EditBoxRec;
-        self.status_message =
-            "Optional BoxRec IDs: [Tab/↑/↓] switch fighter, [Enter] save, [Esc] cancel.".to_string();
+        self.status_message = "Edit BoxRec IDs".to_string();
     }
 
     pub fn submit_boxrec_ids(&mut self) {
@@ -221,7 +288,7 @@ impl App {
                 }
                 self.reload_matches();
                 self.screen = self.previous_screen;
-                self.status_message = format!("Saved BoxRec IDs for {}.", updated.title());
+                self.status_message = format!("Saved BoxRec IDs for {}", updated.title());
             }
             Err(e) => {
                 self.status_message = format!("Failed to save BoxRec IDs: {}", e);
@@ -229,8 +296,13 @@ impl App {
         }
     }
 
-    /// Opens the Finish / Stoppage modal (TKO, RTD/Towel, KO, Decision/Complete) to record the result and mark complete.
+    /// Opens the Finish / Stoppage modal (TKO, RTD/Towel, KO, DQ, TD, Decision).
     pub fn open_finish_match_modal(&mut self) {
+        self.open_finish_match_modal_with(None);
+    }
+
+    pub fn open_finish_match_modal_with(&mut self, preset_method: Option<FinishMethod>) {
+        self.confirm_delete_id = None;
         let target = match self.screen {
             Screen::Scoring => self.current_match.clone(),
             Screen::Home => self.matches.get(self.selected_match_idx).cloned(),
@@ -238,7 +310,7 @@ impl App {
         };
 
         let Some(m) = target else {
-            self.status_message = "Select or open a match first to finish/stop it.".to_string();
+            self.status_message = "No match selected.".to_string();
             return;
         };
 
@@ -250,30 +322,90 @@ impl App {
         self.finish_max_rounds = m.scheduled_rounds;
         self.finish_field = FinishField::Method;
 
+        let (tot_a, tot_b) = m.total_scores();
+        self.finish_cards_summary = format!(
+            "{} {} - {} {} ({} {})",
+            m.fighter_a,
+            tot_a,
+            tot_b,
+            m.fighter_b,
+            m.locked_rounds.len(),
+            if m.locked_rounds.len() == 1 {
+                "rd"
+            } else {
+                "rds"
+            }
+        );
+
         if let Some(existing) = &m.outcome {
-            self.finish_method = existing.method;
+            self.finish_method = preset_method.unwrap_or(existing.method);
             self.finish_winner = existing.winner;
             self.finish_round = existing.round;
         } else {
-            self.finish_method = FinishMethod::Tko;
-            let (tot_a, tot_b) = m.total_scores();
+            self.finish_method = preset_method.unwrap_or(FinishMethod::Tko);
             self.finish_winner = if tot_b > tot_a {
                 Some(FighterSide::FighterB)
             } else {
                 Some(FighterSide::FighterA)
             };
-            let current_rnd = m
-                .active_round
-                .as_ref()
-                .map(|r| r.round_number.max(1))
-                .unwrap_or_else(|| (m.locked_rounds.len() as u8).max(1));
-            self.finish_round = current_rnd.min(m.scheduled_rounds);
+
+            // Determine the current round smartly from the active round, resumed round, or running timer
+            let timer_round = if self.screen == Screen::Scoring {
+                self.timer.as_ref().and_then(|t| match t.phase {
+                    TimerPhase::InRound { round } => Some(round),
+                    TimerPhase::InBreak { after_round, .. } => Some(after_round),
+                    _ => None,
+                })
+            } else {
+                None
+            };
+
+            let current_rnd = match &m.active_round {
+                Some(r) if !r.is_walkout() => r.round_number,
+                _ => m
+                    .resume_round
+                    .as_ref()
+                    .map(|r| r.round_number)
+                    .or(timer_round)
+                    .unwrap_or_else(|| ((m.locked_rounds.len() as u8) + 1).min(m.scheduled_rounds)),
+            };
+            self.finish_round = current_rnd.clamp(1, m.scheduled_rounds);
         }
 
         self.screen = Screen::FinishMatch;
-        self.status_message =
-            "Record Stoppage / Complete Fight: [Tab/↑/↓] field, [←/→] change option, [Enter] confirm."
-                .to_string();
+        self.status_message = "Finish match".to_string();
+    }
+
+    pub fn preview_finish_outcome(&self) -> String {
+        match self.finish_winner {
+            Some(side) => {
+                let winner_name = match side {
+                    FighterSide::FighterA => self.finish_fighter_a_name.as_str(),
+                    FighterSide::FighterB => self.finish_fighter_b_name.as_str(),
+                };
+                if self.finish_method == FinishMethod::Decision {
+                    format!("{} ({})", winner_name, self.finish_method.short_label())
+                } else {
+                    format!(
+                        "{} by {} (R{})",
+                        winner_name,
+                        self.finish_method.short_label(),
+                        self.finish_round
+                    )
+                }
+            }
+            None => {
+                if self.finish_method == FinishMethod::Decision {
+                    format!("Draw ({})", self.finish_method.short_label())
+                } else {
+                    format!(
+                        "Draw ({} R{})",
+                        self.finish_method.short_label(),
+                        self.finish_round
+                    )
+                }
+            }
+        }
     }
 
     pub fn cycle_finish_winner_next(&mut self) {
@@ -304,31 +436,42 @@ impl App {
             round: self.finish_round,
         };
 
+        // If finishing the currently active match in Scoring, apply directly to preserve in-memory state
+        if self
+            .current_match
+            .as_ref()
+            .map(|m| m.id == match_id)
+            .unwrap_or(false)
+        {
+            if let Some(ref mut m) = self.current_match {
+                m.finish_match(outcome);
+            }
+            if self.save_current_match() {
+                let summary = self
+                    .current_match
+                    .as_ref()
+                    .and_then(|m| m.outcome_summary())
+                    .unwrap_or_else(|| "Complete".to_string());
+                if let Some(ref mut timer) = self.timer {
+                    timer.phase = TimerPhase::Completed;
+                    timer.remaining = Duration::ZERO;
+                    timer.paused = true;
+                    timer.last_prompt = None;
+                }
+                self.screen = self.previous_screen;
+                self.status_message = format!("Result: {}", summary);
+            }
+            return;
+        }
+
         match self.service.finish_match(match_id, outcome) {
             Ok(updated) => {
                 let summary = updated
                     .outcome_summary()
                     .unwrap_or_else(|| "Complete".to_string());
-                if self
-                    .current_match
-                    .as_ref()
-                    .map(|m| m.id == updated.id)
-                    .unwrap_or(false)
-                {
-                    self.current_match = Some(updated);
-                    if let Some(ref mut timer) = self.timer {
-                        timer.phase = TimerPhase::Completed;
-                        timer.remaining = Duration::ZERO;
-                        timer.paused = true;
-                        timer.last_prompt = None;
-                    }
-                }
                 self.reload_matches();
                 self.screen = self.previous_screen;
-                self.status_message = format!(
-                    "Fight marked COMPLETE — Result: {} (Timer stopped permanently)",
-                    summary
-                );
+                self.status_message = format!("Result: {}", summary);
             }
             Err(e) => {
                 self.status_message = format!("Failed to finish match: {}", e);
@@ -358,7 +501,7 @@ impl App {
         let date_str = self
             .parse_input_date()
             .map(|d| d.format("%d %b %Y").to_string())
-            .unwrap_or_else(|| "Invalid Date (use DD Mon YYYY, e.g. 01 Jan 2026)".to_string());
+            .unwrap_or_else(|| "Invalid Date (e.g. 01 Jan 2026)".to_string());
         format!("{} v {} ({})", a, b, date_str)
     }
 
@@ -371,7 +514,7 @@ impl App {
         }
         let Some(date) = self.parse_input_date() else {
             self.status_message =
-                "Invalid date! Use format '01 Jan 2026' or '2026-01-01'.".to_string();
+                "Invalid date (use '01 Jan 2026' or '2026-01-01').".to_string();
             return;
         };
 
@@ -387,6 +530,7 @@ impl App {
     }
 
     pub fn start_scoring_match(&mut self, boxing_match: BoxingMatch) {
+        self.confirm_delete_id = None;
         let mut timer = MatchTimer::new(
             boxing_match.scheduled_rounds,
             boxing_match.round_duration_secs,
@@ -398,34 +542,27 @@ impl App {
             timer.remaining = Duration::ZERO;
             timer.paused = true;
             timer.last_prompt = None;
-            let res = boxing_match
+            self.status_message = boxing_match
                 .outcome_summary()
-                .map(|s| format!(" — Result: {}", s))
-                .unwrap_or_default();
-            self.status_message = format!(
-                "Viewing completed scorecard for {}{}. Press [F] to edit result or [U] to reopen.",
-                boxing_match.title(),
-                res
-            );
+                .unwrap_or_else(|| "Match complete".to_string());
             self.alert_until = None;
         } else {
             match &boxing_match.active_round {
                 Some(active) if active.is_walkout() => {
-                    timer.phase = TimerPhase::Ready { next_round: 1 };
+                    let next_rnd = boxing_match
+                        .resume_round
+                        .as_ref()
+                        .map(|r| r.round_number)
+                        .unwrap_or(1);
+                    timer.phase = TimerPhase::Ready {
+                        next_round: next_rnd,
+                    };
                     timer.last_prompt = None;
-                    self.status_message = format!(
-                        "🎵 Pre-Fight Walkout for {} — Score the ring walks, then press [Enter/Space] to start Round 1!",
-                        boxing_match.title()
-                    );
+                    self.status_message = "Walkout — [Enter] Lock & start R1".to_string();
                 }
                 Some(active) => {
-                    timer.phase = TimerPhase::InRound {
-                        round: active.round_number,
-                    };
-                    self.status_message = format!(
-                        "Scoring {} — [1/2]: -1 pt | [!/Shift+1] or [@/Shift+2]: +1 pt | [Enter]: Lock | [F]: Stoppage/Finish",
-                        boxing_match.title()
-                    );
+                    timer.sync_to_round(active.round_number);
+                    self.status_message = format!("Scoring Round {}", active.round_number);
                 }
                 None => {
                     timer.phase = TimerPhase::Completed;
@@ -446,19 +583,19 @@ impl App {
             return;
         };
         if m.deduct_point(side) {
-            let _ = self.service.save_match(m);
-            let (fighter_name, restore_hint) = match side {
-                FighterSide::FighterA => (&m.fighter_a, "[!] or [Shift+A] / [W]"),
-                FighterSide::FighterB => (&m.fighter_b, "[@] or [Shift+D] / [E]"),
+            let fighter_name = match side {
+                FighterSide::FighterA => m.fighter_a.clone(),
+                FighterSide::FighterB => m.fighter_b.clone(),
             };
-            self.status_message = format!(
-                "Deducted 1 point from {} (Press {} to restore)",
-                fighter_name, restore_hint
-            );
-            self.reload_matches();
+            let restore_hint = match side {
+                FighterSide::FighterA => "[!/W]",
+                FighterSide::FighterB => "[@/E]",
+            };
+            if self.save_current_match() {
+                self.status_message = format!("-1 {} ({} restore)", fighter_name, restore_hint);
+            }
         } else if m.is_complete() {
-            self.status_message =
-                "Match is complete! Press [U] to reopen or [F] to change the result.".to_string();
+            self.status_message = "Match complete — [U]ndo or [F]inish".to_string();
         }
     }
 
@@ -467,15 +604,15 @@ impl App {
             return;
         };
         if m.restore_point(side) {
-            let _ = self.service.save_match(m);
             let fighter_name = match side {
-                FighterSide::FighterA => &m.fighter_a,
-                FighterSide::FighterB => &m.fighter_b,
+                FighterSide::FighterA => m.fighter_a.clone(),
+                FighterSide::FighterB => m.fighter_b.clone(),
             };
-            self.status_message = format!("Restored 1 point to {}", fighter_name);
-            self.reload_matches();
+            if self.save_current_match() {
+                self.status_message = format!("+1 {}", fighter_name);
+            }
         } else if !m.is_complete() {
-            self.status_message = "Fighter is already at the maximum 10 points.".to_string();
+            self.status_message = "Already at 10 pts".to_string();
         }
     }
 
@@ -483,31 +620,33 @@ impl App {
         let Some(ref mut m) = self.current_match else {
             return;
         };
-        if let Some(locked) = m.lock_round() {
-            let _ = self.service.save_match(m);
-            if locked.is_walkout() {
+        let Some(locked) = m.lock_round() else {
+            self.status_message = "Match complete — [U]ndo or [F]inish".to_string();
+            return;
+        };
+
+        let fighter_a = m.fighter_a.clone();
+        let fighter_b = m.fighter_b.clone();
+        let next_round_num = m.active_round.as_ref().map(|r| r.round_number);
+        let (tot_a, tot_b) = m.total_scores();
+        let outcome_summary = m.outcome_summary();
+
+        if !self.save_current_match() {
+            return;
+        }
+
+        if locked.is_walkout() {
+            if let Some(next_rnd) = next_round_num {
                 if let Some(ref mut timer) = self.timer {
-                    if let TimerPhase::Ready { next_round } = timer.phase {
-                        timer.phase = TimerPhase::InRound { round: next_round };
-                        timer.remaining = timer.round_duration;
+                    if matches!(timer.phase, TimerPhase::Ready { .. }) {
+                        timer.sync_to_round(next_rnd);
                         timer.paused = false;
-                        timer.last_prompt = Some(TimerPrompt::RoundStarted { round: next_round });
                     }
                 }
                 self.alert_until = Some(Instant::now() + Duration::from_secs(3));
                 self.status_message = format!(
-                    "Locked Walkout Score ({} {} - {} {})! 🔔 BELL — Round 1 has started!",
-                    m.fighter_a, locked.fighter_a_score, locked.fighter_b_score, m.fighter_b
-                );
-            } else if let Some(next_active) = &m.active_round {
-                self.status_message = format!(
-                    "Locked Round {} ({} {} - {} {}). Now scoring Round {}.",
-                    locked.round_number,
-                    m.fighter_a,
-                    locked.fighter_a_score,
-                    locked.fighter_b_score,
-                    m.fighter_b,
-                    next_active.round_number
+                    "Walkout {}-{} locked — 🔔 Round {}",
+                    locked.fighter_a_score, locked.fighter_b_score, next_rnd
                 );
             } else {
                 if let Some(ref mut timer) = self.timer {
@@ -516,17 +655,42 @@ impl App {
                     timer.paused = true;
                     timer.last_prompt = None;
                 }
-                let (tot_a, tot_b) = m.total_scores();
                 self.status_message = format!(
-                    "Locked final Round {}! Official Final Score: {} {} - {} {} (Match Complete)",
-                    locked.round_number, m.fighter_a, tot_a, tot_b, m.fighter_b
+                    "Walkout {}-{} — {}",
+                    locked.fighter_a_score,
+                    locked.fighter_b_score,
+                    outcome_summary.unwrap_or_else(|| "Complete".to_string())
                 );
             }
-            self.reload_matches();
+        } else if let Some(next_rnd) = next_round_num {
+            if let Some(ref mut timer) = self.timer {
+                // Keep timer aligned with the newly opened round unless currently in the break leading into it
+                let in_matching_break = matches!(
+                    timer.phase,
+                    TimerPhase::InBreak { next_round, .. } if next_round == next_rnd
+                );
+                if !in_matching_break {
+                    timer.sync_to_round(next_rnd);
+                }
+            }
+            self.status_message = format!(
+                "R{} locked ({}-{}) — Scoring R{}",
+                locked.round_number,
+                locked.fighter_a_score,
+                locked.fighter_b_score,
+                next_rnd
+            );
         } else {
-            self.status_message =
-                "Match is complete! Press [F] to edit result or [U] to undo the last round."
-                    .to_string();
+            if let Some(ref mut timer) = self.timer {
+                timer.phase = TimerPhase::Completed;
+                timer.remaining = Duration::ZERO;
+                timer.paused = true;
+                timer.last_prompt = None;
+            }
+            self.status_message = format!(
+                "Final: {} {} - {} {}",
+                fighter_a, tot_a, tot_b, fighter_b
+            );
         }
     }
 
@@ -535,31 +699,31 @@ impl App {
             return;
         };
         if m.undo_last_round() {
-            let _ = self.service.save_match(m);
-            if let Some(active) = &m.active_round {
+            let active_copy = m.active_round.clone();
+            let outcome_summary = m.outcome_summary();
+            if !self.save_current_match() {
+                return;
+            }
+            if let Some(active) = active_copy {
                 if active.is_walkout() {
                     if let Some(ref mut timer) = self.timer {
                         timer.phase = TimerPhase::Ready { next_round: 1 };
                         timer.remaining = timer.round_duration;
+                        timer.last_prompt = None;
                     }
-                    self.status_message =
-                        "🎵 Scoring Pre-Fight Walkout! Use [1/2] to deduct, [!/Shift+1] or [@/Shift+2] to restore, [Enter] to lock."
-                            .to_string();
+                    self.status_message = "Re-opened Walkout".to_string();
                 } else {
                     if let Some(ref mut timer) = self.timer {
-                        timer.phase = TimerPhase::InRound {
-                            round: active.round_number,
-                        };
-                        timer.remaining = timer.round_duration;
+                        timer.sync_to_round(active.round_number);
                         timer.paused = false;
                     }
-                    self.status_message =
-                        format!("Re-opened Round {} for editing.", active.round_number);
+                    self.status_message = format!("Re-opened Round {}", active.round_number);
                 }
+            } else if let Some(summary) = outcome_summary {
+                self.status_message = format!("Result: {}", summary);
             }
-            self.reload_matches();
         } else {
-            self.status_message = "Already at Pre-Fight Walkout.".to_string();
+            self.status_message = "Already at Walkout".to_string();
         }
     }
 
@@ -568,17 +732,19 @@ impl App {
             return;
         };
         m.open_walkout();
-        let _ = self.service.save_match(m);
-        if m.locked_rounds.is_empty() {
+        let has_locked_or_resumed =
+            !m.locked_rounds.is_empty() || m.resume_round.is_some() || m.outcome.is_some();
+        if !self.save_current_match() {
+            return;
+        }
+        if !has_locked_or_resumed {
             if let Some(ref mut timer) = self.timer {
                 timer.phase = TimerPhase::Ready { next_round: 1 };
                 timer.remaining = timer.round_duration;
+                timer.last_prompt = None;
             }
         }
-        self.status_message =
-            "🎵 Scoring Pre-Fight Walkout! Use [1/2] to deduct, [!/Shift+1] or [@/Shift+2] to restore, [Enter] to lock."
-                .to_string();
-        self.reload_matches();
+        self.status_message = "Walkout — [Enter] Lock".to_string();
     }
 
     pub fn on_tick(&mut self, delta: Duration) {

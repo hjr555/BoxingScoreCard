@@ -31,9 +31,25 @@ cargo run --bin boxing -- --file my_matches.json
 | **Restore 1 point** (Fighter 1) | `!` (`Shift+1`), `Shift+A`, or `w` |
 | **Deduct 1 point** (Fighter 2) | `2`, `Right Arrow`, or `d` |
 | **Restore 1 point** (Fighter 2) | `@` (`Shift+2`), `Shift+D`, or `e` |
-| **Lock Round In** | `Enter` or `Space` |
-| **Undo Last Locked Round** | `u` |
+| **Lock Round / Walkout In** | `Enter` or `Space` |
+| **End / Stop Fight Mid-Way (TKO)** | `f`, `s`, or `x` |
+| **End / Stop Fight Mid-Way (KO)** | `k` |
+| **End / Stop Fight Mid-Way (RTD / Towel)** | `r` |
+| **Edit Pre-Fight Walkout Score** | `0` |
+| **Edit Fighter BoxRec IDs** | `b` |
+| **Undo Last Round / Undo Stoppage** | `u` |
 | **Pause / Resume Timer** | `p` |
 | **Skip Timer Phase** (Round ↔ Break) | `t` |
 | **Return to Matches Menu** | `Esc` or `m` |
 | **Quit** | `q` or `Ctrl+C` |
+
+## Keyboard Shortcuts (End / Stop Fight Modal)
+
+| Action | Keyboard Shortcut |
+| :--- | :--- |
+| **Select Winner** | `1` (Fighter 1), `2` (Fighter 2), `0` (Draw), or `←` / `→` |
+| **Select Finish Method** | `t` (TKO), `k` (KO), `r` (RTD / Towel), `q` (DQ), `d` (Decision / TD), or `←` / `→` |
+| **Adjust Stoppage Round** | `-` / `[` (Earlier Round), `+` / `]` (Later Round), or `←` / `→` |
+| **Switch Field** | `Tab`, `↑`, or `↓` |
+| **Confirm & End Fight** | `Enter` or `Space` |
+| **Cancel** | `Esc` |

@@ -34,8 +34,14 @@ impl<R: MatchRepository> ScoringService<R> {
         date: NaiveDate,
         scheduled_rounds: u8,
     ) -> Result<BoxingMatch, StorageError> {
-        let mut boxing_match = BoxingMatch::new(fighter_a, fighter_b, date);
-        boxing_match.scheduled_rounds = scheduled_rounds.max(1);
+        let boxing_match = BoxingMatch::with_config(
+            fighter_a,
+            fighter_b,
+            date,
+            scheduled_rounds,
+            crate::models::DEFAULT_ROUND_DURATION_SECS,
+            crate::models::DEFAULT_BREAK_DURATION_SECS,
+        );
         self.repository.save_match(&boxing_match)?;
         Ok(boxing_match)
     }

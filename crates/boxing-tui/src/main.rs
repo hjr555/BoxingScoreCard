@@ -2,7 +2,7 @@ mod app;
 mod ui;
 
 use app::{App, FinishField, FormField, Screen};
-use boxing_core::{FighterSide, JsonMatchRepository, ScoringService};
+use boxing_core::{FighterSide, FinishMethod, JsonMatchRepository, ScoringService};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
     execute,
@@ -10,10 +10,15 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{
-    env, io,
+    env, io, panic,
     path::PathBuf,
     time::{Duration, Instant},
 };
+
+fn restore_terminal() {
+    let _ = disable_raw_mode();
+    let _ = execute!(io::stdout(), LeaveAlternateScreen);
+}
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -27,7 +32,7 @@ fn main() -> io::Result<()> {
                 idx += 2;
             }
             "--help" | "-h" => {
-                println!("Boxing Match Scorer (TUI MVP)");
+                println!("Boxing Scorecard");
                 println!("Usage: boxing [--file <matches.json>]");
                 return Ok(());
             }
@@ -41,6 +46,13 @@ fn main() -> io::Result<()> {
     let service = ScoringService::new(repo);
     let mut app = App::new(service);
 
+    // Install panic hook so raw mode and alternate screen are always cleaned up on panic
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |panic_info| {
+        restore_terminal();
+        default_hook(panic_info);
+    }));
+
     // Setup terminal (pure keyboard control)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -51,8 +63,7 @@ fn main() -> io::Result<()> {
     let res = run_event_loop(&mut terminal, &mut app);
 
     // Restore terminal
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    restore_terminal();
     terminal.show_cursor()?;
 
     if let Err(err) = res {
@@ -104,20 +115,28 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             KeyCode::Char('q') | KeyCode::Char('Q') => app.should_quit = true,
             KeyCode::Char('n') | KeyCode::Char('N') => app.open_new_match_form(),
             KeyCode::Char('b') | KeyCode::Char('B') => app.open_boxrec_editor(),
-            KeyCode::Char('f') | KeyCode::Char('F') | KeyCode::Char('s') | KeyCode::Char('S') => {
+            KeyCode::Char('f')
+            | KeyCode::Char('F')
+            | KeyCode::Char('s')
+            | KeyCode::Char('S')
+            | KeyCode::Char('x')
+            | KeyCode::Char('X') => {
                 app.open_finish_match_modal();
             }
             KeyCode::Up | KeyCode::Char('k') => {
+                app.confirm_delete_id = None;
                 if app.selected_match_idx > 0 {
                     app.selected_match_idx -= 1;
                 }
             }
             KeyCode::Down | KeyCode::Char('j') => {
+                app.confirm_delete_id = None;
                 if app.selected_match_idx + 1 < app.matches.len() {
                     app.selected_match_idx += 1;
                 }
             }
             KeyCode::Enter => {
+                app.confirm_delete_id = None;
                 if let Some(m) = app.matches.get(app.selected_match_idx).cloned() {
                     app.start_scoring_match(m);
                 } else {
@@ -125,16 +144,21 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                 }
             }
             KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Delete => {
-                if let Some(m) = app.matches.get(app.selected_match_idx) {
-                    let id = m.id;
-                    let title = m.title();
-                    if app.service.delete_match(id).is_ok() {
-                        app.reload_matches();
-                        app.status_message = format!("Deleted match: {}", title);
-                    }
+                app.request_delete_selected_match();
+            }
+            KeyCode::Char('y') | KeyCode::Char('Y') if app.confirm_delete_id.is_some() => {
+                app.request_delete_selected_match();
+            }
+            KeyCode::Esc if app.confirm_delete_id.is_some() => {
+                app.confirm_delete_id = None;
+                app.status_message = "Cancelled match deletion.".to_string();
+            }
+            _ => {
+                if app.confirm_delete_id.is_some() {
+                    app.confirm_delete_id = None;
+                    app.status_message = "Cancelled match deletion.".to_string();
                 }
             }
-            _ => {}
         },
         Screen::NewMatch => match code {
             KeyCode::Esc => {
@@ -219,13 +243,13 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                 app.screen = app.previous_screen;
                 app.status_message = "Cancelled stoppage / finish.".to_string();
             }
-            KeyCode::Tab | KeyCode::Down => {
+            KeyCode::Tab | KeyCode::Down | KeyCode::Char('j') => {
                 app.finish_field = app.finish_field.next();
             }
             KeyCode::BackTab | KeyCode::Up => {
                 app.finish_field = app.finish_field.prev();
             }
-            KeyCode::Left => match app.finish_field {
+            KeyCode::Left | KeyCode::Char('h') => match app.finish_field {
                 FinishField::Method => app.finish_method = app.finish_method.prev(),
                 FinishField::Winner => app.cycle_finish_winner_prev(),
                 FinishField::Round => {
@@ -234,7 +258,7 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                     }
                 }
             },
-            KeyCode::Right => match app.finish_field {
+            KeyCode::Right | KeyCode::Char('l') => match app.finish_field {
                 FinishField::Method => app.finish_method = app.finish_method.next(),
                 FinishField::Winner => app.cycle_finish_winner_next(),
                 FinishField::Round => {
@@ -243,7 +267,58 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                     }
                 }
             },
-            KeyCode::Enter => {
+            // Instant Winner hotkeys (1 = Fighter 1, 2 = Fighter 2, 0 = Draw)
+            KeyCode::Char('1') => {
+                app.finish_winner = Some(FighterSide::FighterA);
+                app.finish_field = FinishField::Winner;
+            }
+            KeyCode::Char('2') => {
+                app.finish_winner = Some(FighterSide::FighterB);
+                app.finish_field = FinishField::Winner;
+            }
+            KeyCode::Char('0') => {
+                app.finish_winner = None;
+                app.finish_field = FinishField::Winner;
+            }
+            // Instant Method hotkeys (T = TKO, K = KO, R = RTD/Towel, Q = DQ, D = Decision/TD)
+            KeyCode::Char('t') | KeyCode::Char('T') => {
+                app.finish_method = FinishMethod::Tko;
+                app.finish_field = FinishField::Method;
+            }
+            KeyCode::Char('k') | KeyCode::Char('K') => {
+                app.finish_method = FinishMethod::Ko;
+                app.finish_field = FinishField::Method;
+            }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                app.finish_method = FinishMethod::Rtd;
+                app.finish_field = FinishField::Method;
+            }
+            KeyCode::Char('q') | KeyCode::Char('Q') => {
+                app.finish_method = FinishMethod::Dq;
+                app.finish_field = FinishField::Method;
+            }
+            KeyCode::Char('d') | KeyCode::Char('D') => {
+                app.finish_method = if app.finish_method == FinishMethod::Decision {
+                    FinishMethod::Td
+                } else {
+                    FinishMethod::Decision
+                };
+                app.finish_field = FinishField::Method;
+            }
+            // Instant Round hotkeys (- / +)
+            KeyCode::Char('-') | KeyCode::Char('[') => {
+                if app.finish_round > 1 {
+                    app.finish_round -= 1;
+                }
+                app.finish_field = FinishField::Round;
+            }
+            KeyCode::Char('+') | KeyCode::Char('=') | KeyCode::Char(']') => {
+                if app.finish_round < app.finish_max_rounds {
+                    app.finish_round += 1;
+                }
+                app.finish_field = FinishField::Round;
+            }
+            KeyCode::Enter | KeyCode::Char(' ') => {
                 app.submit_finish_match();
             }
             _ => {}
@@ -294,9 +369,20 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                 app.open_boxrec_editor();
             }
 
-            // Record Stoppage (TKO, Towel/RTD, KO, DQ) or Mark Fight Complete
-            KeyCode::Char('f') | KeyCode::Char('F') | KeyCode::Char('s') | KeyCode::Char('S') => {
+            // Record Stoppage (TKO, Towel/RTD, KO, DQ) or Mark Fight Complete mid-way
+            KeyCode::Char('f')
+            | KeyCode::Char('F')
+            | KeyCode::Char('s')
+            | KeyCode::Char('S')
+            | KeyCode::Char('x')
+            | KeyCode::Char('X') => {
                 app.open_finish_match_modal();
+            }
+            KeyCode::Char('k') | KeyCode::Char('K') => {
+                app.open_finish_match_modal_with(Some(FinishMethod::Ko));
+            }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                app.open_finish_match_modal_with(Some(FinishMethod::Rtd));
             }
 
             // Timer controls

@@ -93,7 +93,8 @@ mod tests {
             prompt,
             Some(TimerPrompt::BreakStarted {
                 after_round: 1,
-                next_round: 2
+                next_round: 2,
+                break_duration_secs: 60,
             })
         );
         assert_eq!(
@@ -143,6 +144,10 @@ mod tests {
         m.lock_round();
         assert!(!m.is_complete());
 
+        // Deduct a knockdown point in Round 2 before stoppage
+        m.deduct_point(FighterSide::FighterB);
+        m.deduct_point(FighterSide::FighterB);
+
         // Corner throws in the towel in Round 2 (RTD win for Fighter A)
         m.finish_match(MatchOutcome {
             method: FinishMethod::Rtd,
@@ -154,9 +159,49 @@ mod tests {
         assert!(m.active_round.is_none());
         assert_eq!(m.outcome_summary().as_deref(), Some("Dubois by RTD (R2)"));
 
-        // Undo reopens Round 2 if stopped by mistake
+        // Editing walkout after a stoppage does not erase the stoppage outcome
+        m.open_walkout();
+        m.deduct_point(FighterSide::FighterB);
+        m.lock_round();
+        assert!(m.is_complete());
+        assert_eq!(m.outcome_summary().as_deref(), Some("Dubois by RTD (R2)"));
+        assert_eq!(m.walkout_score.as_ref().unwrap().fighter_b_score, 9);
+
+        // Undo reopens Round 2 with its partial 10-8 score if stopped by mistake
         assert!(m.undo_last_round());
         assert!(!m.is_complete());
+        let active = m.active_round.as_ref().unwrap();
+        assert_eq!(active.round_number, 2);
+        assert_eq!(active.fighter_a_score, 10);
+        assert_eq!(active.fighter_b_score, 8);
+    }
+
+    #[test]
+    fn test_mid_match_walkout_preserves_active_round() {
+        let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        let mut m = BoxingMatch::new("Usyk", "Fury", date);
+
+        // Lock Walkout & Round 1
+        m.lock_round();
+        m.lock_round();
+
+        // In Round 2, deduct a point from Fury (10 - 9)
+        m.deduct_point(FighterSide::FighterB);
         assert_eq!(m.active_round.as_ref().unwrap().round_number, 2);
+        assert_eq!(m.active_round.as_ref().unwrap().fighter_b_score, 9);
+
+        // Jump to Walkout mid-Round 2, score it 10 - 8, and lock Walkout
+        m.open_walkout();
+        assert!(m.active_round.as_ref().unwrap().is_walkout());
+        m.deduct_point(FighterSide::FighterB);
+        m.deduct_point(FighterSide::FighterB);
+        m.lock_round();
+
+        // Should resume Round 2 with its in-progress 10 - 9 score intact!
+        let active = m.active_round.as_ref().unwrap();
+        assert_eq!(active.round_number, 2);
+        assert_eq!(active.fighter_a_score, 10);
+        assert_eq!(active.fighter_b_score, 9);
+        assert_eq!(m.walkout_score.as_ref().unwrap().fighter_b_score, 8);
     }
 }
