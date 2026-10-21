@@ -64,6 +64,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
             .bg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
     )]))
+    .alignment(Alignment::Center)
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
