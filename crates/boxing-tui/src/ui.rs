@@ -971,6 +971,15 @@ fn draw_scorecard_table(
         }
     }
 
+    // Blank spacer row after Walkout so official rounds stand out clearly
+    rows.push(Row::new(vec![String::new(), String::new(), String::new()]));
+
+    let has_official_rounds = !m.locked_rounds.is_empty()
+        || m.active_round
+            .as_ref()
+            .map(|r| !r.is_walkout())
+            .unwrap_or(false);
+
     for r in &m.locked_rounds {
         let style = if r.fighter_a_score > r.fighter_b_score {
             Style::default().fg(Color::LightRed)
@@ -1006,6 +1015,10 @@ fn draw_scorecard_table(
         }
     }
 
+    if has_official_rounds {
+        rows.push(Row::new(vec![String::new(), String::new(), String::new()]));
+    }
+
     if let Some(out) = &m.outcome {
         let (col_a, col_b) = match out.winner {
             Some(FighterSide::FighterA) => (
@@ -1028,6 +1041,7 @@ fn draw_scorecard_table(
                     .add_modifier(Modifier::BOLD),
             ),
         );
+        rows.push(Row::new(vec![String::new(), String::new(), String::new()]));
     }
 
     let (tot_a, tot_b) = m.total_scores();
@@ -1233,6 +1247,89 @@ mod tests {
             .clickable_links
             .iter()
             .any(|(_, _, _, url)| url == RELEASES_URL));
+    }
+
+    #[test]
+    fn test_scoring_screen_completed_fight_layout_and_spacing() {
+        let repo = JsonMatchRepository::new(PathBuf::from("nonexistent_test_matches.json"));
+        let service = ScoringService::new(repo);
+        let mut app = App::new(service);
+
+        let mut m = BoxingMatch::new(
+            "Daniel Dubois",
+            "Fabio Wardley",
+            NaiveDate::from_ymd_opt(2026, 10, 17).unwrap(),
+        );
+        m.set_boxrec_id(FighterSide::FighterA, "787430");
+        m.set_boxrec_id(FighterSide::FighterB, "785893");
+        // Walkout 9-10
+        m.deduct_point(FighterSide::FighterA);
+        m.lock_round();
+        // Round 1 10-9
+        m.deduct_point(FighterSide::FighterB);
+        m.lock_round();
+        // TKO in Round 2
+        m.finish_match(MatchOutcome {
+            method: FinishMethod::Tko,
+            winner: Some(FighterSide::FighterA),
+            round: 2,
+        });
+
+        app.start_scoring_match(m);
+
+        let backend = TestBackend::new(110, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
+        let buf = terminal.backend().buffer();
+
+        let mut lines = Vec::new();
+        for y in 0..buf.area.height {
+            let mut row = String::new();
+            for x in 0..buf.area.width {
+                row.push_str(buf[(x, y)].symbol());
+            }
+            lines.push(row);
+        }
+        let full_screen = lines.join("\n");
+
+        // Issue #11: verbose header score removed
+        assert!(!full_screen.contains("Score: Daniel Dubois"));
+        // Issue #12: round scoring shortcuts hidden on completed fight
+        assert!(!full_screen.contains("[-1] 1 / ← / A"));
+        assert!(!full_screen.contains("[-1] 2 / → / D"));
+        // Issue #13: winner and loser clearly shown instead of FINAL
+        assert!(full_screen.contains("WINNER"));
+        assert!(full_screen.contains("LOSER"));
+        assert!(!full_screen.contains("FINAL"));
+        // Issue #14: capitalised border title present, centred standard-case duplicate removed
+        assert!(full_screen.contains("DANIEL DUBOIS"));
+        assert!(full_screen.contains("FABIO WARDLEY"));
+        let card_body = lines[6..].join("\n");
+        assert!(!card_body.contains("Daniel Dubois"));
+        assert!(!card_body.contains("Fabio Wardley"));
+        // Issue #15: spacing after Walkout, before Result, and before TOTAL
+        let walkout_row = lines
+            .iter()
+            .position(|l| l.contains("Walkout"))
+            .expect("Walkout row");
+        let r1_row = lines
+            .iter()
+            .position(|l| l.contains("R1"))
+            .expect("R1 row");
+        let result_row = lines
+            .iter()
+            .position(|l| l.contains("WIN (TKO)"))
+            .expect("Result row");
+        let total_row = lines
+            .iter()
+            .position(|l| l.contains("TOTAL"))
+            .expect("TOTAL row");
+        assert!(r1_row >= walkout_row + 2, "Expected blank line after Walkout");
+        assert!(result_row >= r1_row + 2, "Expected blank line before Result");
+        assert!(
+            total_row >= result_row + 2,
+            "Expected blank line between Result and TOTAL"
+        );
     }
 
     fn buffer_to_svg(buf: &ratatui::buffer::Buffer, title: &str) -> String {
