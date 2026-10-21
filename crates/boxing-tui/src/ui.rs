@@ -862,45 +862,40 @@ fn draw_fighter_card(
     hint: &str,
     clickable_links: &mut Vec<(u16, u16, u16, String)>,
 ) {
-    let title_str = format!(" {} ", name.to_uppercase());
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title_str)
-        .border_style(Style::default().fg(accent));
-
-    let inner = block.inner(area);
-    f.render_widget(block, area);
-
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(2),
-            Constraint::Min(5),
-            Constraint::Length(1),
-        ])
-        .split(inner);
-
-    let header_style = if boxrec_id.is_some() {
+    let title_style = if boxrec_id.is_some() {
         Style::default()
             .fg(accent)
             .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
     } else {
         Style::default().fg(accent).add_modifier(Modifier::BOLD)
     };
+    let upper_name = name.to_uppercase();
+    let title_line = Line::from(vec![
+        Span::raw(" "),
+        Span::styled(upper_name.clone(), title_style),
+        Span::raw(" "),
+    ]);
 
-    let header = Paragraph::new(name)
-        .alignment(Alignment::Center)
-        .style(header_style);
-    f.render_widget(header, rows[0]);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(title_line)
+        .border_style(Style::default().fg(accent));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
 
     if let Some(id) = boxrec_id {
-        let name_w = (name.chars().count() as u16).min(rows[0].width);
+        let max_w = area.width.saturating_sub(4);
+        let name_w = (upper_name.chars().count() as u16).min(max_w);
         if name_w > 0 {
-            let name_x = rows[0].x + rows[0].width.saturating_sub(name_w) / 2;
-            clickable_links.push((name_x, rows[0].y, name_w, boxrec_url(id)));
+            clickable_links.push((area.x + 2, area.y, name_w, boxrec_url(id)));
         }
     }
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(5), Constraint::Length(1)])
+        .split(inner);
 
     let big_score = Paragraph::new(vec![
         Line::from(""),
@@ -918,7 +913,7 @@ fn draw_fighter_card(
         )),
     ])
     .alignment(Alignment::Center);
-    f.render_widget(big_score, rows[1]);
+    f.render_widget(big_score, rows[0]);
 
     if is_active {
         let instructions = Paragraph::new(Line::from(Span::styled(
@@ -926,7 +921,7 @@ fn draw_fighter_card(
             Style::default().fg(Color::Gray),
         )))
         .alignment(Alignment::Center);
-        f.render_widget(instructions, rows[2]);
+        f.render_widget(instructions, rows[1]);
     }
 }
 
