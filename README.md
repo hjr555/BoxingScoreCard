@@ -19,7 +19,7 @@ Keyboard driven, round-by-round fight scores, pre-fight walkouts, round timers, 
 
 ## Getting Started
 
-### Option 1: Download Pre-Built Executable (No Rust Required)
+### Download & Run
 
 Pre-built executables for **Windows**, **Linux**, and **macOS** (Apple Silicon & Intel) are available on the [**GitHub Releases**](https://github.com/hjr555/BoxingScoreCard/releases/latest) page:
 
@@ -30,49 +30,7 @@ Pre-built executables for **Windows**, **Linux**, and **macOS** (Apple Silicon &
 | **macOS (Apple Silicon)** | `boxing-macos-arm64` (or `.tar.gz`) | `chmod +x boxing-macos-arm64 && ./boxing-macos-arm64` |
 | **macOS (Intel)** | `boxing-macos-x86_64` (or `.tar.gz`) | `chmod +x boxing-macos-x86_64 && ./boxing-macos-x86_64` |
 
----
-
-### Option 2: Build from Source with Cargo
-
-#### Prerequisites
-
-- [Rust](https://rustup.rs/) (edition 2021, 1.75+)
-
-#### Run Directly with Cargo
-
-From the repository root:
-
-```bash
-cargo run --release --bin boxing
-```
-
-By default, matches are saved to `matches.json` in the current working directory. To use a custom file path:
-
-```bash
-cargo run --release --bin boxing -- --file path/to/matches.json
-```
-
-### Install Locally
-
-To install the `boxing` binary into `~/.cargo/bin`:
-
-```bash
-cargo install --path crates/boxing-tui
-```
-
-Then run from anywhere:
-
-```bash
-boxing
-# or with a custom storage file:
-boxing --file ~/fights/matches.json
-```
-
-### Run Tests
-
-```bash
-cargo test
-```
+By default, your scorecards are saved automatically to `matches.json` in the current directory.
 
 ---
 
@@ -130,7 +88,44 @@ cargo test
 
 ---
 
-## Project Structure
+## Development & Testing
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (edition 2021, 1.75+)
+
+### Build & Run from Source
+
+```bash
+# Run in release mode (uses matches.json by default):
+cargo run --release --bin boxing
+
+# Install locally into ~/.cargo/bin:
+cargo install --path crates/boxing-tui
+```
+
+### Switching Data Sources (`--test` / `--file`)
+
+When developing or testing, you can point the app at a test database (`matches.test.json`) or any custom JSON file without touching your main `matches.json`:
+
+```bash
+# Launch with the test database (matches.test.json):
+boxing --test
+# or via cargo:
+cargo run --release --bin boxing -- --test
+
+# Launch with any custom JSON file (positional or --file / -f / --db):
+boxing path/to/custom.json
+boxing --file path/to/custom.json
+```
+
+### Run Tests
+
+```bash
+cargo test
+```
+
+### Project Structure
 
 - **`crates/boxing-core`**: Core domain library
   - [`BoxingMatch`](crates/boxing-core/src/models.rs): Match state, walkout and round scoring, outcomes (`TKO`, `KO`, `RTD`, `DQ`, `TD`, `DEC`), and undo logic.

@@ -2,9 +2,10 @@
 /target
 **/*.rs.bk
 
-# Local match data
+# Local match data (keep matches.test.json tracked for development/testing)
 *.json
 *.json.tmp
+!matches.test.json
 
 # OS & Editor files
 .DS_Store

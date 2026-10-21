@@ -30,10 +30,15 @@ fn main() -> io::Result<()> {
 
     let mut idx = 1;
     while idx < args.len() {
-        match args[idx].as_str() {
-            "--file" | "-f" if idx + 1 < args.len() => {
+        let arg = args[idx].as_str();
+        match arg {
+            "--file" | "-f" | "--db" if idx + 1 < args.len() => {
                 json_path = PathBuf::from(&args[idx + 1]);
                 idx += 2;
+            }
+            "--test" | "-t" => {
+                json_path = PathBuf::from("matches.test.json");
+                idx += 1;
             }
             "--version" | "-V" => {
                 println!("boxing {}", env!("CARGO_PKG_VERSION"));
@@ -41,8 +46,12 @@ fn main() -> io::Result<()> {
             }
             "--help" | "-h" => {
                 println!("Boxing Scorecard v{}", env!("CARGO_PKG_VERSION"));
-                println!("Usage: boxing [--file <matches.json>] [--version]");
+                println!("Usage: boxing [matches.json] [--file <path>] [--test] [--version]");
                 return Ok(());
+            }
+            _ if !arg.starts_with('-') => {
+                json_path = PathBuf::from(arg);
+                idx += 1;
             }
             _ => {
                 idx += 1;
@@ -50,9 +59,17 @@ fn main() -> io::Result<()> {
         }
     }
 
+    let file_label = json_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("matches.json")
+        .to_string();
     let repo = JsonMatchRepository::new(json_path);
     let service = ScoringService::new(repo);
     let mut app = App::new(service);
+    if app.status_message == "Ready" {
+        app.status_message = format!("Loaded {} ({} matches)", file_label, app.matches.len());
+    }
 
     // Install panic hook so raw mode and alternate screen are always cleaned up on panic
     let default_hook = panic::take_hook();
