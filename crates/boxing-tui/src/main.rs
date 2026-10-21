@@ -82,6 +82,23 @@ fn main() -> io::Result<()> {
 }
 
 fn open_url_in_browser(url: &str) {
+    #[cfg(target_os = "windows")]
+    let _ = Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+
+    #[cfg(target_os = "macos")]
+    let _ = Command::new("open")
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     let _ = Command::new("xdg-open")
         .arg(url)
         .stdin(Stdio::null())

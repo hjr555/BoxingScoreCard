@@ -14,11 +14,26 @@ A terminal-based boxing scorecard for tracking round-by-round fight scores, pre-
 
 ## Getting Started
 
-### Prerequisites
+### Option 1: Download Pre-Built Executable (No Rust Required)
+
+Pre-built executables for **Windows**, **Linux**, and **macOS** (Apple Silicon & Intel) are available on the [**GitHub Releases**](https://github.com/hjr555/BoxingScoreCard/releases/latest) page:
+
+| Platform | Download | How to Run |
+| :--- | :--- | :--- |
+| **Windows (x64)** | `boxing-windows-x86_64.exe` (or `.zip`) | Double-click `boxing-windows-x86_64.exe` or run it from PowerShell / Command Prompt |
+| **Linux (x86_64)** | `boxing-linux-x86_64` (or `.tar.gz`) | `chmod +x boxing-linux-x86_64 && ./boxing-linux-x86_64` |
+| **macOS (Apple Silicon)** | `boxing-macos-arm64` (or `.tar.gz`) | `chmod +x boxing-macos-arm64 && ./boxing-macos-arm64` |
+| **macOS (Intel)** | `boxing-macos-x86_64` (or `.tar.gz`) | `chmod +x boxing-macos-x86_64 && ./boxing-macos-x86_64` |
+
+---
+
+### Option 2: Build from Source with Cargo
+
+#### Prerequisites
 
 - [Rust](https://rustup.rs/) (edition 2021, 1.75+)
 
-### Run Directly with Cargo
+#### Run Directly with Cargo
 
 From the repository root:
 
