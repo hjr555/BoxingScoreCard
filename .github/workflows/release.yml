@@ -99,7 +99,7 @@ jobs:
           merge-multiple: true
 
       - name: Generate SHA256 checksums
-        working-dir: artifacts
+        working-directory: artifacts
         run: sha256sum * > SHA256SUMS.txt
 
       - name: Create GitHub Release and upload binaries
