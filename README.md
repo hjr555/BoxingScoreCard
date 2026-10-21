@@ -4,7 +4,8 @@
 
 > **📦 [Download Pre-Built Executables (Windows, Linux, macOS)](https://github.com/hjr555/BoxingScoreCard/releases/latest)** — No Rust or build tools required! Visit the [**Releases Page**](https://github.com/hjr555/BoxingScoreCard/releases) to download and run the latest version directly.
 
-A terminal-based boxing scorecard for tracking round-by-round fight scores, pre-fight walkouts, round timers, and fight outcomes.
+Just for fun! I like scoring boxing matches when I watch them, and wanted a simple way to record these, and refer back to them.
+Keyboard driven, round-by-round fight scores, pre-fight walkouts, round timers, and fight outcomes.
 
 ## Features
 
