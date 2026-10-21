@@ -4,8 +4,8 @@ pub mod storage;
 pub mod timer;
 
 pub use models::{
-    ActiveRound, BoxingMatch, FighterSide, FinishMethod, MatchOutcome, RoundScore,
-    DEFAULT_BREAK_DURATION_SECS, DEFAULT_INITIAL_POINTS, DEFAULT_ROUND_DURATION_SECS,
+    fighter_last_name, ActiveRound, BoxingMatch, FighterSide, FinishMethod, MatchOutcome,
+    RoundScore, DEFAULT_BREAK_DURATION_SECS, DEFAULT_INITIAL_POINTS, DEFAULT_ROUND_DURATION_SECS,
     DEFAULT_SCHEDULED_ROUNDS, WALKOUT_ROUND_NUMBER,
 };
 pub use service::ScoringService;
@@ -279,7 +279,7 @@ mod tests {
         assert!(m2.is_complete());
         assert_eq!(
             m2.outcome_summary().as_deref(),
-            Some("Oleksandr Usyk (DEC)")
+            Some("Usyk (DEC)")
         );
     }
 }

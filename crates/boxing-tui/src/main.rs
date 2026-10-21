@@ -4,7 +4,10 @@ mod ui;
 use app::{App, FinishField, FormField, Screen};
 use boxing_core::{FighterSide, FinishMethod, JsonMatchRepository, ScoringService};
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+        MouseButton, MouseEventKind,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -12,12 +15,13 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{
     env, io, panic,
     path::PathBuf,
+    process::{Command, Stdio},
     time::{Duration, Instant},
 };
 
 fn restore_terminal() {
     let _ = disable_raw_mode();
-    let _ = execute!(io::stdout(), LeaveAlternateScreen);
+    let _ = execute!(io::stdout(), DisableMouseCapture, LeaveAlternateScreen);
 }
 
 fn main() -> io::Result<()> {
@@ -57,10 +61,10 @@ fn main() -> io::Result<()> {
         default_hook(panic_info);
     }));
 
-    // Setup terminal (pure keyboard control)
+    // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -77,6 +81,15 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
+fn open_url_in_browser(url: &str) {
+    let _ = Command::new("xdg-open")
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+}
+
 fn run_event_loop<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
@@ -89,10 +102,28 @@ fn run_event_loop<B: ratatui::backend::Backend>(
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    handle_key_event(app, key.code, key.modifiers);
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        handle_key_event(app, key.code, key.modifiers);
+                    }
                 }
+                Event::Mouse(mouse) => {
+                    if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                        for (lx, ly, lw, url) in &app.clickable_links {
+                            if mouse.row == *ly
+                                && mouse.column >= *lx
+                                && mouse.column < lx.saturating_add(*lw)
+                            {
+                                let target = url.clone();
+                                open_url_in_browser(&target);
+                                app.status_message = format!("Opened {}", target);
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
@@ -139,7 +170,7 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                     app.selected_match_idx += 1;
                 }
             }
-            KeyCode::Enter => {
+            KeyCode::Enter | KeyCode::Char('o') | KeyCode::Char('O') => {
                 app.confirm_delete_id = None;
                 if let Some(m) = app.matches.get(app.selected_match_idx).cloned() {
                     app.start_scoring_match(m);

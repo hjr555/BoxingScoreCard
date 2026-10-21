@@ -1,20 +1,26 @@
 use crate::app::{App, FinishField, FormField, Screen};
-use boxing_core::{FighterSide, TimerPhase};
+use boxing_core::{fighter_last_name, FighterSide, TimerPhase};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Clear, Gauge, List, ListItem, ListState, Paragraph, Row, Table, TableState,
-    },
+    widgets::{Block, Borders, Clear, Gauge, Paragraph, Row, Table, TableState},
     Frame,
 };
 
+const BOXREC_URL_PREFIX: &str = "https://boxrec.com/en/box-pro/";
+
+fn boxrec_url(id: &str) -> String {
+    format!("{}{}", BOXREC_URL_PREFIX, id.trim())
+}
+
 pub fn draw(f: &mut Frame, app: &mut App) {
+    app.clickable_links.clear();
     match app.screen {
         Screen::Home => draw_home(f, app),
         Screen::NewMatch => {
             draw_home(f, app);
+            app.clickable_links.clear();
             draw_new_match_modal(f, app);
         }
         Screen::Scoring => draw_scoring(f, app),
@@ -24,6 +30,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             } else {
                 draw_home(f, app);
             }
+            app.clickable_links.clear();
             draw_boxrec_modal(f, app);
         }
         Screen::FinishMatch => {
@@ -32,6 +39,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             } else {
                 draw_home(f, app);
             }
+            app.clickable_links.clear();
             draw_finish_match_modal(f, app);
         }
     }
@@ -44,8 +52,8 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(8),
-            Constraint::Length(3),
-            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(1),
         ])
         .split(f.area());
 
@@ -59,48 +67,62 @@ fn draw_home(f: &mut Frame, app: &mut App) {
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
-    let items: Vec<ListItem> = if app.matches.is_empty() {
-        vec![ListItem::new(Line::from(Span::styled(
+    if app.matches.is_empty() {
+        let empty = Paragraph::new(Line::from(Span::styled(
             "  No matches yet — [N]ew match",
             Style::default().fg(Color::DarkGray),
-        )))]
+        )))
+        .block(Block::default().borders(Borders::ALL).title(" Matches "));
+        f.render_widget(empty, chunks[1]);
     } else {
-        app.matches
+        let rows: Vec<Row> = app
+            .matches
             .iter()
             .enumerate()
             .map(|(idx, m)| {
                 let (tot_a, tot_b) = m.total_scores();
                 let status = if let Some(summary) = m.outcome_summary() {
-                    format!("FINAL: {}", summary)
+                    summary
                 } else {
                     match &m.active_round {
                         Some(r) if r.is_walkout() => "Walkout".to_string(),
                         Some(r) => format!("Round {}/{}", r.round_number, m.scheduled_rounds),
-                        None => "FINAL".to_string(),
+                        None => "Complete".to_string(),
                     }
                 };
-                let walkout_info = match &m.walkout_score {
-                    Some(w) => format!("Walkout: {}-{}", w.fighter_a_score, w.fighter_b_score),
-                    None => "Walkout: —".to_string(),
-                };
-                let fa_display = match &m.fighter_a_boxrec_id {
-                    Some(id) => format!("{} (#{})", m.fighter_a, id),
-                    None => m.fighter_a.clone(),
-                };
-                let fb_display = match &m.fighter_b_boxrec_id {
-                    Some(id) => format!("{} (#{})", m.fighter_b, id),
-                    None => m.fighter_b.clone(),
-                };
-                let line = format!(
-                    " {:<32} | {:<22} | {:<13} | {} {} - {} {}",
-                    m.title(),
-                    status,
-                    walkout_info,
-                    fa_display,
-                    tot_a,
-                    tot_b,
-                    fb_display
-                );
+                let fa_last = fighter_last_name(&m.fighter_a).to_string();
+                let fb_last = fighter_last_name(&m.fighter_b).to_string();
+                let link_mod = Style::default().add_modifier(Modifier::UNDERLINED);
+
+                let match_line = Line::from(vec![
+                    if m.fighter_a_boxrec_id.is_some() {
+                        Span::styled(m.fighter_a.clone(), link_mod)
+                    } else {
+                        Span::raw(m.fighter_a.clone())
+                    },
+                    Span::raw(" v "),
+                    if m.fighter_b_boxrec_id.is_some() {
+                        Span::styled(m.fighter_b.clone(), link_mod)
+                    } else {
+                        Span::raw(m.fighter_b.clone())
+                    },
+                    Span::raw(format!(" ({})", m.date.format("%d %b %Y"))),
+                ]);
+
+                let score_line = Line::from(vec![
+                    if m.fighter_a_boxrec_id.is_some() {
+                        Span::styled(fa_last, link_mod)
+                    } else {
+                        Span::raw(fa_last)
+                    },
+                    Span::raw(format!(" {} - {} ", tot_a, tot_b)),
+                    if m.fighter_b_boxrec_id.is_some() {
+                        Span::styled(fb_last, link_mod)
+                    } else {
+                        Span::raw(fb_last)
+                    },
+                ]);
+
                 let style = if idx == app.selected_match_idx {
                     Style::default()
                         .fg(Color::Black)
@@ -109,43 +131,124 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                 } else {
                     Style::default().fg(Color::White)
                 };
-                ListItem::new(line).style(style)
+                Row::new(vec![match_line, Line::from(status), score_line]).style(style)
             })
-            .collect()
-    };
+            .collect();
 
-    let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Matches "),
-    );
-    let mut list_state = ListState::default();
-    if !app.matches.is_empty() {
-        list_state.select(Some(app.selected_match_idx));
+        let col_widths = [
+            Constraint::Percentage(48),
+            Constraint::Percentage(26),
+            Constraint::Percentage(26),
+        ];
+        let table_block = Block::default().borders(Borders::ALL).title(" Matches ");
+        let table_inner = table_block.inner(chunks[1]);
+
+        let table = Table::new(rows, col_widths)
+            .column_spacing(2)
+            .header(
+                Row::new(vec!["Match", "Status", "Scorecard"]).style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            )
+            .block(table_block);
+
+        let mut table_state = TableState::default();
+        table_state.select(Some(app.selected_match_idx));
+        f.render_stateful_widget(table, chunks[1], &mut table_state);
+
+        // Register clickable BoxRec fighter name regions in the Match and Scorecard columns
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .spacing(2)
+            .constraints(col_widths)
+            .split(table_inner);
+        let first_idx = table_state.offset();
+        let max_visible_rows = table_inner.height.saturating_sub(1) as usize;
+        for (vis_row, m) in app
+            .matches
+            .iter()
+            .skip(first_idx)
+            .take(max_visible_rows)
+            .enumerate()
+        {
+            let row_y = table_inner.y + 1 + vis_row as u16;
+            if row_y >= table_inner.y + table_inner.height {
+                break;
+            }
+            let (tot_a, tot_b) = m.total_scores();
+            let fa_last = fighter_last_name(&m.fighter_a);
+            let fb_last = fighter_last_name(&m.fighter_b);
+            let fa_full_w = m.fighter_a.chars().count() as u16;
+            let fb_full_w = m.fighter_b.chars().count() as u16;
+            let fa_last_w = fa_last.chars().count() as u16;
+            let fb_last_w = fb_last.chars().count() as u16;
+
+            if let Some(ref id_a) = m.fighter_a_boxrec_id {
+                let url_a = boxrec_url(id_a);
+                let w_match = fa_full_w.min(cols[0].width);
+                if w_match > 0 {
+                    app.clickable_links
+                        .push((cols[0].x, row_y, w_match, url_a.clone()));
+                }
+                let w_score = fa_last_w.min(cols[2].width);
+                if w_score > 0 {
+                    app.clickable_links
+                        .push((cols[2].x, row_y, w_score, url_a));
+                }
+            }
+
+            if let Some(ref id_b) = m.fighter_b_boxrec_id {
+                let url_b = boxrec_url(id_b);
+                let match_b_offset = fa_full_w.saturating_add(3); // " v "
+                if match_b_offset < cols[0].width {
+                    let w_match = fb_full_w.min(cols[0].width - match_b_offset);
+                    if w_match > 0 {
+                        app.clickable_links.push((
+                            cols[0].x + match_b_offset,
+                            row_y,
+                            w_match,
+                            url_b.clone(),
+                        ));
+                    }
+                }
+                let score_prefix = format!("{} {} - {} ", fa_last, tot_a, tot_b);
+                let score_b_offset = score_prefix.chars().count() as u16;
+                if score_b_offset < cols[2].width {
+                    let w_score = fb_last_w.min(cols[2].width - score_b_offset);
+                    if w_score > 0 {
+                        app.clickable_links.push((
+                            cols[2].x + score_b_offset,
+                            row_y,
+                            w_score,
+                            url_b,
+                        ));
+                    }
+                }
+            }
+        }
     }
-    f.render_stateful_widget(list, chunks[1], &mut list_state);
 
-    let btn = Paragraph::new(" + [N]ew Match ")
-        .alignment(Alignment::Center)
-        .style(
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        )
-        .block(Block::default().borders(Borders::NONE));
+    let btn = Paragraph::new(
+        " [N]ew   [O]pen   [F]inish   [B]oxRec   [D]elete   [Q]uit ",
+    )
+    .alignment(Alignment::Center)
+    .style(
+        Style::default()
+            .fg(Color::Black)
+            .bg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+    );
     f.render_widget(btn, chunks[2]);
 
-    let footer = Paragraph::new(format!(
-        " {}  |  [N]ew  [Enter] Open  [F]inish  [B]oxRec  [D]elete  [Q]uit",
-        app.status_message
-    ))
-    .style(Style::default().fg(Color::Gray));
+    let footer = Paragraph::new(format!(" {}", app.status_message))
+        .style(Style::default().fg(Color::Gray));
     f.render_widget(footer, chunks[3]);
 }
 
 fn draw_new_match_modal(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(60, 62, f.area());
+    let area = centered_modal(64, 21, f.area());
     f.render_widget(Clear, area);
 
     let block = Block::default()
@@ -163,7 +266,7 @@ fn draw_new_match_modal(f: &mut Frame, app: &mut App) {
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
-            Constraint::Min(2),
+            Constraint::Min(1),
         ])
         .split(area);
 
@@ -225,7 +328,7 @@ fn draw_new_match_modal(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_boxrec_modal(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(56, 45, f.area());
+    let area = centered_modal(56, 12, f.area());
     f.render_widget(Clear, area);
 
     let block = Block::default()
@@ -240,7 +343,7 @@ fn draw_boxrec_modal(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
-            Constraint::Min(2),
+            Constraint::Min(1),
         ])
         .split(area);
 
@@ -282,7 +385,7 @@ fn draw_boxrec_modal(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_finish_match_modal(f: &mut Frame, app: &mut App) {
-    let area = centered_rect(68, 65, f.area());
+    let area = centered_modal(72, 18, f.area());
     f.render_widget(Clear, area);
 
     let block = Block::default()
@@ -300,7 +403,7 @@ fn draw_finish_match_modal(f: &mut Frame, app: &mut App) {
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
-            Constraint::Min(2),
+            Constraint::Min(1),
         ])
         .split(area);
 
@@ -386,8 +489,8 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
             Constraint::Length(3), // Match Header
             Constraint::Length(4), // Timer Banner
             Constraint::Min(10),   // Fighter Cards + Scorecard Table
-            Constraint::Length(3), // Action Bar
-            Constraint::Length(2), // Status & Controls Bar
+            Constraint::Length(1), // Action Bar
+            Constraint::Length(1), // Status & Controls Bar
         ])
         .split(f.area());
 
@@ -400,7 +503,7 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         .unwrap_or(false);
 
     let (round_status, badge_bg) = if let Some(summary) = m.outcome_summary() {
-        (format!("🏆 FINAL: {}", summary), Color::Green)
+        (format!("🏆 {}", summary), Color::Green)
     } else {
         match &m.active_round {
             Some(active) if active.is_walkout() => ("🎵 WALKOUT".to_string(), Color::Magenta),
@@ -408,7 +511,7 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
                 format!("ROUND {} / {}", active.round_number, m.scheduled_rounds),
                 Color::Blue,
             ),
-            None => ("FINAL".to_string(), Color::DarkGray),
+            None => ("Complete".to_string(), Color::DarkGray),
         }
     };
 
@@ -545,31 +648,45 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         "FINAL"
     };
 
+    let fa_name = m.fighter_a.clone();
+    let fb_name = m.fighter_b.clone();
+    let fa_boxrec = m.fighter_a_boxrec_id.clone();
+    let fb_boxrec = m.fighter_b_boxrec_id.clone();
+    let is_active = m.active_round.is_some();
+
     draw_fighter_card(
         f,
         cards_split[0],
-        &m.fighter_a,
-        m.fighter_a_boxrec_id.as_deref(),
+        &fa_name,
+        fa_boxrec.as_deref(),
         score_a,
-        m.active_round.is_some(),
+        is_active,
         points_caption,
         Color::LightRed,
         "[-1] 1 / ← / A   [+1] ! / W",
+        &mut app.clickable_links,
     );
 
     draw_fighter_card(
         f,
         cards_split[1],
-        &m.fighter_b,
-        m.fighter_b_boxrec_id.as_deref(),
+        &fb_name,
+        fb_boxrec.as_deref(),
         score_b,
-        m.active_round.is_some(),
+        is_active,
         points_caption,
         Color::LightBlue,
         "[-1] 2 / → / D   [+1] @ / E",
+        &mut app.clickable_links,
     );
 
-    draw_scorecard_table(f, main_split[1], m);
+    if let Some(ref m_ref) = app.current_match {
+        draw_scorecard_table(f, main_split[1], m_ref, &mut app.clickable_links);
+    }
+
+    let Some(ref m) = app.current_match else {
+        return;
+    };
 
     // 4. Bottom Action Bar
     match &m.active_round {
@@ -626,24 +743,21 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
             let summary = m
                 .outcome_summary()
                 .unwrap_or_else(|| "COMPLETE".to_string());
-            let done_btn = Paragraph::new(format!(
-                " ✅ {}  —  [F]inish  [U]ndo  [Esc] Matches ",
-                summary
-            ))
-            .alignment(Alignment::Center)
-            .style(
-                Style::default()
-                    .fg(Color::White)
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            );
+            let done_btn = Paragraph::new(format!(" ✅ {} ", summary))
+                .alignment(Alignment::Center)
+                .style(
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                );
             f.render_widget(done_btn, root[3]);
         }
     }
 
     // 5. Status & Help Footer
     let footer = Paragraph::new(format!(
-        " {}  |  [F]inish  [0] Walkout  [B]oxRec  [U]ndo  [P]ause  [Esc] Matches",
+        " {}  |  [0] Walkout  [B]oxRec  [U]ndo  [Esc] Matches",
         app.status_message
     ))
     .style(Style::default().fg(Color::Gray));
@@ -661,11 +775,9 @@ fn draw_fighter_card(
     points_caption: &str,
     accent: Color,
     hint: &str,
+    clickable_links: &mut Vec<(u16, u16, u16, String)>,
 ) {
-    let title_str = match boxrec_id {
-        Some(id) => format!(" {} (#{}) ", name.to_uppercase(), id),
-        None => format!(" {} ", name.to_uppercase()),
-    };
+    let title_str = format!(" {} ", name.to_uppercase());
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -684,15 +796,26 @@ fn draw_fighter_card(
         ])
         .split(inner);
 
-    let subtitle = match boxrec_id {
-        Some(id) => format!("{}  [BoxRec #{}]", name, id),
-        None => name.to_string(),
+    let header_style = if boxrec_id.is_some() {
+        Style::default()
+            .fg(accent)
+            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+    } else {
+        Style::default().fg(accent).add_modifier(Modifier::BOLD)
     };
 
-    let header = Paragraph::new(subtitle)
+    let header = Paragraph::new(name)
         .alignment(Alignment::Center)
-        .style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
+        .style(header_style);
     f.render_widget(header, rows[0]);
+
+    if let Some(id) = boxrec_id {
+        let name_w = (name.chars().count() as u16).min(rows[0].width);
+        if name_w > 0 {
+            let name_x = rows[0].x + rows[0].width.saturating_sub(name_w) / 2;
+            clickable_links.push((name_x, rows[0].y, name_w, boxrec_url(id)));
+        }
+    }
 
     let score_display = if is_active {
         format!("{}", score)
@@ -726,7 +849,12 @@ fn draw_fighter_card(
     f.render_widget(instructions, rows[2]);
 }
 
-fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch) {
+fn draw_scorecard_table(
+    f: &mut Frame,
+    area: Rect,
+    m: &boxing_core::BoxingMatch,
+    clickable_links: &mut Vec<(u16, u16, u16, String)>,
+) {
     let mut rows: Vec<Row> = Vec::new();
 
     // Walkout row before Round 1
@@ -841,26 +969,41 @@ fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch)
     );
 
     let row_count = rows.len();
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Percentage(36),
-            Constraint::Percentage(32),
-            Constraint::Percentage(32),
-        ],
-    )
-    .header(
-        Row::new(vec!["Round", &m.fighter_a, &m.fighter_b]).style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        ),
-    )
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title(" Scorecard "),
-    );
+    let col_widths = [
+        Constraint::Percentage(36),
+        Constraint::Percentage(32),
+        Constraint::Percentage(32),
+    ];
+    let table_block = Block::default()
+        .borders(Borders::ALL)
+        .title(" Scorecard ");
+    let table_inner = table_block.inner(area);
+    let fa_last = fighter_last_name(&m.fighter_a);
+    let fb_last = fighter_last_name(&m.fighter_b);
+    let link_mod = Style::default().add_modifier(Modifier::UNDERLINED);
+
+    let table = Table::new(rows, col_widths)
+        .header(
+            Row::new(vec![
+                Span::raw("Round"),
+                if m.fighter_a_boxrec_id.is_some() {
+                    Span::styled(fa_last, link_mod)
+                } else {
+                    Span::raw(fa_last)
+                },
+                if m.fighter_b_boxrec_id.is_some() {
+                    Span::styled(fb_last, link_mod)
+                } else {
+                    Span::raw(fb_last)
+                },
+            ])
+            .style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        )
+        .block(table_block);
 
     // Keep the bottom of the scorecard (latest rounds, Result, and TOTAL) visible on small terminals
     let mut table_state = TableState::default();
@@ -868,24 +1011,86 @@ fn draw_scorecard_table(f: &mut Frame, area: Rect, m: &boxing_core::BoxingMatch)
         table_state.select(Some(row_count - 1));
     }
     f.render_stateful_widget(table, area, &mut table_state);
+
+    if table_inner.height > 0 {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .spacing(1)
+            .constraints(col_widths)
+            .split(table_inner);
+        if let Some(ref id_a) = m.fighter_a_boxrec_id {
+            let w = (fa_last.chars().count() as u16).min(cols[1].width);
+            if w > 0 {
+                clickable_links.push((cols[1].x, table_inner.y, w, boxrec_url(id_a)));
+            }
+        }
+        if let Some(ref id_b) = m.fighter_b_boxrec_id {
+            let w = (fb_last.chars().count() as u16).min(cols[2].width);
+            if w > 0 {
+                clickable_links.push((cols[2].x, table_inner.y, w, boxrec_url(id_b)));
+            }
+        }
+    }
 }
 
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
+fn centered_modal(min_width: u16, min_height: u16, r: Rect) -> Rect {
+    let width = min_width.max((r.width * 60) / 100).min(r.width.saturating_sub(2));
+    let height = min_height.min(r.height.saturating_sub(2));
+    let x = r.x + r.width.saturating_sub(width) / 2;
+    let y = r.y + r.height.saturating_sub(height) / 2;
+    Rect::new(x, y, width, height)
+}
 
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::App;
+    use boxing_core::{JsonMatchRepository, ScoringService};
+    use ratatui::{backend::TestBackend, Terminal};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_home_screen_rendering_has_no_artifacts() {
+        let repo = JsonMatchRepository::new(PathBuf::from("../../matches.json"));
+        let service = ScoringService::new(repo);
+        let mut app = App::new(service);
+        let backend = TestBackend::new(110, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
+        let buf = terminal.backend().buffer();
+
+        let mut lines = Vec::new();
+        for y in 0..buf.area.height {
+            let mut row = String::new();
+            for x in 0..buf.area.width {
+                let sym = buf[(x, y)].symbol();
+                assert_eq!(
+                    sym.chars().count(),
+                    1,
+                    "Every cell symbol must be 1 char at ({}, {}): {:?}",
+                    x,
+                    y,
+                    sym
+                );
+                row.push_str(sym);
+            }
+            lines.push(row);
+        }
+        let full_screen = lines.join("\n");
+        assert!(full_screen.contains("Daniel Dubois v Fabio Wardley (17 Oct 2026)"));
+        assert!(full_screen.contains("Dubois by TKO (R2)"));
+        assert!(full_screen.contains("Dubois 10 - 9 Wardley"));
+        assert!(full_screen.contains("[N]ew   [O]pen   [F]inish   [B]oxRec   [D]elete   [Q]uit"));
+        assert!(!full_screen.contains("[Enter] Open"));
+        assert!(!full_screen.contains("FINAL:"));
+        assert!(!full_screen.contains("Walkout"));
+        assert_eq!(app.clickable_links.len(), 4);
+
+        // Verify the green action bar is exactly 1 row high (only 1 row has Color::Green background)
+        let green_rows: Vec<u16> = (0..buf.area.height)
+            .filter(|&y| (0..buf.area.width).any(|x| buf[(x, y)].bg == Color::Green))
+            .collect();
+        assert_eq!(green_rows.len(), 1);
+    }
 }

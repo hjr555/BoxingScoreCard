@@ -192,6 +192,11 @@ pub struct BoxingMatch {
     pub resume_round: Option<ActiveRound>,
 }
 
+/// Extracts the fighter's surname/last name (or full name if single-word) for compact displays.
+pub fn fighter_last_name(name: &str) -> &str {
+    name.split_whitespace().last().unwrap_or(name.trim())
+}
+
 impl BoxingMatch {
     pub fn new(fighter_a: impl Into<String>, fighter_b: impl Into<String>, date: NaiveDate) -> Self {
         Self::with_config(
@@ -248,8 +253,8 @@ impl BoxingMatch {
         match out.winner {
             Some(side) => {
                 let winner_name = match side {
-                    FighterSide::FighterA => self.fighter_a.as_str(),
-                    FighterSide::FighterB => self.fighter_b.as_str(),
+                    FighterSide::FighterA => fighter_last_name(&self.fighter_a),
+                    FighterSide::FighterB => fighter_last_name(&self.fighter_b),
                 };
                 if out.method == FinishMethod::Decision {
                     Some(format!("{} ({})", winner_name, out.method.short_label()))

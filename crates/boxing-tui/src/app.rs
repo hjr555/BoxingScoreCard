@@ -1,6 +1,6 @@
 use boxing_core::{
-    BoxingMatch, FighterSide, FinishMethod, JsonMatchRepository, MatchOutcome, MatchTimer,
-    ScoringService, TimerPhase, DEFAULT_SCHEDULED_ROUNDS,
+    fighter_last_name, BoxingMatch, FighterSide, FinishMethod, JsonMatchRepository, MatchOutcome,
+    MatchTimer, ScoringService, TimerPhase, DEFAULT_SCHEDULED_ROUNDS,
 };
 use chrono::{Local, NaiveDate};
 use std::time::{Duration, Instant};
@@ -80,6 +80,7 @@ pub struct App {
     pub alert_until: Option<Instant>,
     pub should_quit: bool,
     pub confirm_delete_id: Option<Uuid>,
+    pub clickable_links: Vec<(u16, u16, u16, String)>,
 
     // New match form state (minimal, fast: no BoxRec required)
     pub form_field: FormField,
@@ -132,9 +133,10 @@ impl App {
             alert_until: None,
             should_quit: false,
             confirm_delete_id: None,
+            clickable_links: Vec::new(),
             form_field: FormField::FighterA,
-            input_fighter_a: "Joshua".to_string(),
-            input_fighter_b: "Fury".to_string(),
+            input_fighter_a: String::new(),
+            input_fighter_b: String::new(),
             input_date: today.format("%d %b %Y").to_string(),
             input_rounds: DEFAULT_SCHEDULED_ROUNDS,
             boxrec_target_match_id: None,
@@ -227,15 +229,10 @@ impl App {
     pub fn open_new_match_form(&mut self) {
         self.confirm_delete_id = None;
         self.form_field = FormField::FighterA;
-        if self.input_fighter_a.is_empty() {
-            self.input_fighter_a = "Joshua".to_string();
-        }
-        if self.input_fighter_b.is_empty() {
-            self.input_fighter_b = "Fury".to_string();
-        }
-        if self.input_date.is_empty() {
-            self.input_date = Local::now().date_naive().format("%d %b %Y").to_string();
-        }
+        self.input_fighter_a.clear();
+        self.input_fighter_b.clear();
+        self.input_date = Local::now().date_naive().format("%d %b %Y").to_string();
+        self.input_rounds = DEFAULT_SCHEDULED_ROUNDS;
         self.screen = Screen::NewMatch;
         self.status_message = "New match".to_string();
     }
@@ -380,8 +377,8 @@ impl App {
         match self.finish_winner {
             Some(side) => {
                 let winner_name = match side {
-                    FighterSide::FighterA => self.finish_fighter_a_name.as_str(),
-                    FighterSide::FighterB => self.finish_fighter_b_name.as_str(),
+                    FighterSide::FighterA => fighter_last_name(&self.finish_fighter_a_name),
+                    FighterSide::FighterB => fighter_last_name(&self.finish_fighter_b_name),
                 };
                 if self.finish_method == FinishMethod::Decision {
                     format!("{} ({})", winner_name, self.finish_method.short_label())
@@ -489,12 +486,12 @@ impl App {
 
     pub fn preview_title(&self) -> String {
         let a = if self.input_fighter_a.trim().is_empty() {
-            "Fighter A"
+            "Fighter 1"
         } else {
             self.input_fighter_a.trim()
         };
         let b = if self.input_fighter_b.trim().is_empty() {
-            "Fighter B"
+            "Fighter 2"
         } else {
             self.input_fighter_b.trim()
         };

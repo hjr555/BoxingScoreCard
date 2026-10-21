@@ -73,7 +73,7 @@ cargo test
 | :--- | :--- |
 | **New Match** | `n` |
 | **Select Match** | `↑` / `↓` or `k` / `j` |
-| **Open Match** | `Enter` |
+| **Open Match** | `o` or `Enter` |
 | **Finish / Edit Result** | `f`, `s`, or `x` |
 | **Edit BoxRec IDs** | `b` |
 | **Delete Match** | `d` or `Delete` (`y` / `d` to confirm, `Esc` to cancel) |
