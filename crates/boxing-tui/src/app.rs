@@ -3,8 +3,45 @@ use boxing_core::{
     MatchTimer, ScoringService, TimerPhase, DEFAULT_SCHEDULED_ROUNDS,
 };
 use chrono::{Local, NaiveDate};
-use std::time::{Duration, Instant};
+use std::{
+    process::{Command, Stdio},
+    sync::mpsc::{self, Receiver},
+    thread,
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
+
+pub const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+pub const RELEASES_URL: &str = "https://github.com/hjr555/BoxingScoreCard/releases/latest";
+const LATEST_RELEASE_API_URL: &str =
+    "https://api.github.com/repos/hjr555/BoxingScoreCard/releases/latest";
+
+pub fn parse_semver(version: &str) -> Option<(u32, u32, u32)> {
+    let trimmed = version
+        .trim()
+        .trim_start_matches(['v', 'V'])
+        .split(['-', '+'])
+        .next()?;
+    let mut parts = trimmed.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let patch = parts.next()?.parse().ok()?;
+    Some((major, minor, patch))
+}
+
+fn extract_json_tag_name(json: &str) -> Option<String> {
+    let key = "\"tag_name\"";
+    let pos = json.find(key)?;
+    let after_key = &json[pos + key.len()..];
+    let colon = after_key.find(':')?;
+    let after_colon = after_key[colon + 1..].trim_start();
+    if !after_colon.starts_with('"') {
+        return None;
+    }
+    let rest = &after_colon[1..];
+    let end_quote = rest.find('"')?;
+    Some(rest[..end_quote].trim().to_string())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -81,6 +118,8 @@ pub struct App {
     pub should_quit: bool,
     pub confirm_delete_id: Option<Uuid>,
     pub clickable_links: Vec<(u16, u16, u16, String)>,
+    pub latest_release_version: Option<String>,
+    pub release_check_rx: Option<Receiver<String>>,
 
     // New match form state (minimal, fast: no BoxRec required)
     pub form_field: FormField,
@@ -134,6 +173,8 @@ impl App {
             should_quit: false,
             confirm_delete_id: None,
             clickable_links: Vec::new(),
+            latest_release_version: None,
+            release_check_rx: None,
             form_field: FormField::FighterA,
             input_fighter_a: String::new(),
             input_fighter_b: String::new(),
@@ -744,7 +785,58 @@ impl App {
         self.status_message = "Walkout — [Enter] Lock".to_string();
     }
 
+    pub fn spawn_release_check(&mut self) {
+        let (tx, rx) = mpsc::channel();
+        self.release_check_rx = Some(rx);
+        thread::spawn(move || {
+            let output = Command::new("curl")
+                .args([
+                    "-sL",
+                    "--max-time",
+                    "3",
+                    "-H",
+                    "Accept: application/vnd.github+json",
+                    "-H",
+                    "User-Agent: boxing-scorecard",
+                    LATEST_RELEASE_API_URL,
+                ])
+                .stdin(Stdio::null())
+                .stderr(Stdio::null())
+                .output();
+            if let Ok(out) = output {
+                if out.status.success() {
+                    if let Ok(text) = String::from_utf8(out.stdout) {
+                        if let Some(tag) = extract_json_tag_name(&text) {
+                            let _ = tx.send(tag);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn poll_release_check(&mut self) {
+        if let Some(ref rx) = self.release_check_rx {
+            if let Ok(tag) = rx.try_recv() {
+                self.latest_release_version = Some(tag);
+                self.release_check_rx = None;
+            }
+        }
+    }
+
+    pub fn is_update_available(&self) -> Option<&str> {
+        let latest = self.latest_release_version.as_deref()?;
+        let current_ver = parse_semver(APP_VERSION)?;
+        let latest_ver = parse_semver(latest)?;
+        if latest_ver > current_ver {
+            Some(latest)
+        } else {
+            None
+        }
+    }
+
     pub fn on_tick(&mut self, delta: Duration) {
+        self.poll_release_check();
         if self.screen == Screen::Scoring {
             if let Some(ref mut timer) = self.timer {
                 if let Some(prompt) = timer.tick(delta) {

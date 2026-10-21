@@ -67,6 +67,7 @@ fn main() -> io::Result<()> {
     let repo = JsonMatchRepository::new(json_path);
     let service = ScoringService::new(repo);
     let mut app = App::new(service);
+    app.spawn_release_check();
     if app.status_message == "Ready" {
         app.status_message = format!("Loaded {} ({} matches)", file_label, app.matches.len());
     }

@@ -1,4 +1,4 @@
-use crate::app::{App, FinishField, FormField, Screen};
+use crate::app::{App, FinishField, FormField, Screen, APP_VERSION, RELEASES_URL};
 use boxing_core::{fighter_last_name, FighterSide, TimerPhase};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -57,6 +57,10 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         ])
         .split(f.area());
 
+    let top_block = Block::default().borders(Borders::ALL);
+    let top_inner = top_block.inner(chunks[0]);
+    f.render_widget(top_block, chunks[0]);
+
     let title = Paragraph::new(Line::from(vec![Span::styled(
         " 🥊 BOXING SCORECARD ",
         Style::default()
@@ -64,9 +68,43 @@ fn draw_home(f: &mut Frame, app: &mut App) {
             .bg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
     )]))
-    .alignment(Alignment::Center)
-    .block(Block::default().borders(Borders::ALL));
-    f.render_widget(title, chunks[0]);
+    .alignment(Alignment::Center);
+    f.render_widget(title, top_inner);
+
+    if top_inner.height > 0 && top_inner.width > 0 {
+        if let Some(latest) = app.is_update_available() {
+            let update_label = format!(" {} ↑ Update ({}) ", APP_VERSION, latest);
+            let label_w = (update_label.chars().count() as u16).min(top_inner.width);
+            if label_w > 0 {
+                let label_x = top_inner.x + top_inner.width.saturating_sub(label_w);
+                let label_rect = Rect::new(label_x, top_inner.y, label_w, 1);
+                let update_widget = Paragraph::new(Span::styled(
+                    update_label,
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::LightCyan)
+                        .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                ));
+                f.render_widget(update_widget, label_rect);
+                app.clickable_links
+                    .push((label_x, top_inner.y, label_w, RELEASES_URL.to_string()));
+            }
+        } else {
+            let ver_label = format!("{} ", APP_VERSION);
+            let label_w = (ver_label.chars().count() as u16).min(top_inner.width);
+            if label_w > 0 {
+                let label_x = top_inner.x + top_inner.width.saturating_sub(label_w);
+                let label_rect = Rect::new(label_x, top_inner.y, label_w, 1);
+                let ver_widget = Paragraph::new(Span::styled(
+                    ver_label,
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                f.render_widget(ver_widget, label_rect);
+            }
+        }
+    }
 
     if app.matches.is_empty() {
         let empty = Paragraph::new(Line::from(Span::styled(
@@ -1104,6 +1142,7 @@ mod tests {
         }
         let full_screen = lines.join("\n");
         assert!(full_screen.contains("Daniel Dubois v Fabio Wardley (17 Oct 2026)"));
+        assert!(full_screen.contains(APP_VERSION));
         assert!(full_screen.contains("Dubois by TKO (R2)"));
         assert!(full_screen.contains("Dubois 10 - 9 Wardley"));
         assert!(full_screen.contains("[N]ew   [O]pen   [F]inish   [B]oxRec   [D]elete   [Q]uit"));
@@ -1117,6 +1156,25 @@ mod tests {
             .filter(|&y| (0..buf.area.width).any(|x| buf[(x, y)].bg == Color::Green))
             .collect();
         assert_eq!(green_rows.len(), 1);
+
+        // Verify update indicator and clickable GitHub Releases link when behind latest version
+        app.latest_release_version = Some("v99.0.0".to_string());
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
+        let buf_upd = terminal.backend().buffer();
+        let mut upd_lines = Vec::new();
+        for y in 0..buf_upd.area.height {
+            let mut row = String::new();
+            for x in 0..buf_upd.area.width {
+                row.push_str(buf_upd[(x, y)].symbol());
+            }
+            upd_lines.push(row);
+        }
+        let upd_screen = upd_lines.join("\n");
+        assert!(upd_screen.contains("↑ Update (v99.0.0)"));
+        assert!(app
+            .clickable_links
+            .iter()
+            .any(|(_, _, _, url)| url == RELEASES_URL));
     }
 
     fn buffer_to_svg(buf: &ratatui::buffer::Buffer, title: &str) -> String {
