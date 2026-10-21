@@ -92,6 +92,57 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes from commits and issues
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          python3 - << 'PY'
+          import os, re, subprocess
+
+          tag = os.environ["RELEASE_TAG"]
+          try:
+              prev_tag = subprocess.check_output(
+                  ["git", "describe", "--tags", "--abbrev=0", f"{tag}^"],
+                  stderr=subprocess.DEVNULL,
+              ).decode().strip()
+              rev_range = f"{prev_tag}..{tag}"
+          except subprocess.CalledProcessError:
+              prev_tag = None
+              rev_range = tag
+
+          log_out = subprocess.check_output([
+              "git", "log", rev_range, "--no-merges", "--pretty=format:%H%x1f%s%x1f%b%x1e"
+          ]).decode()
+
+          items = []
+          for entry in reversed([e.strip() for e in log_out.split("\x1e") if e.strip()]):
+              parts = (entry.split("\x1f") + ["", ""])[:3]
+              sha, subject, body = parts[0], parts[1].strip(), parts[2].strip()
+              short_sha = sha[:7]
+              if re.match(r"^Release v\d+\.\d+\.\d+", subject):
+                  continue
+              issues = re.findall(r"(?:Fixes|Closes|Resolves)\s+(#\d+)", subject + "\n" + body, re.IGNORECASE)
+              issue_ref = f" ({', '.join(issues)})" if issues else ""
+              items.append(f"* {subject}{issue_ref} (`{short_sha}`)")
+
+          lines = ["## What's Changed"]
+          if items:
+              lines.extend(items)
+          else:
+              lines.append(f"* Release {tag}")
+          if prev_tag:
+              lines.append("")
+              lines.append(f"**Full Changelog**: https://github.com/hjr555/BoxingScoreCard/compare/{prev_tag}...{tag}")
+
+          with open("RELEASE_NOTES.md", "w") as f:
+              f.write("\n".join(lines) + "\n")
+          PY
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -107,5 +158,5 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           name: Boxing Scorecard ${{ github.event.inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
           files: artifacts/*
