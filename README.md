@@ -22,8 +22,9 @@ Keyboard driven, round-by-round fight scores, pre-fight walkouts, round timers, 
 - **10-Point Must Scoring**: Starts both fighters at 10 points each round with single-keystroke point deductions (`-1`), restorations (`+1`), round lock-in, and multi-step undo.
 - **Pre-Fight Walkout**: Score the ring walks before Round 1 (or revisit anytime with `0`) without affecting the official fight total.
 - **Round & Break Timer**: Tracks 3-minute rounds, 1-minute breaks, and 10-second warnings without blocking manual scoring.
-- **Stoppages & Decisions**: Record `TKO`, `KO`, `RTD`, `DQ`, `TD`, or full-distance `DEC` outcomes at any point.
-- **BoxRec IDs**: Attach Fighter BoxRec IDs to any match.
+- **Stoppages & Decisions**: Record `TKO`, `KO`, `RTD`, `DQ`, `TD`, or full-distance `DEC` outcomes at any point, with clear `WINNER` / `LOSER` status cards on completed fights.
+- **Clickable BoxRec Links**: Attach Fighter BoxRec IDs (`b`) to any match and click underlined fighter names to open their BoxRec profile in your browser.
+- **Release Update Indicator**: Displays the current version in the top bar and highlights clickable update notifications when a newer GitHub release is available.
 
 ---
 
