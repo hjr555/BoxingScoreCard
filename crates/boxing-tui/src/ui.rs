@@ -176,7 +176,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         let table = Table::new(rows, col_widths)
             .column_spacing(2)
             .header(
-                Row::new(vec!["Date", "Match", "Status", "Scorecard"]).style(
+                Row::new(vec!["Date", "Match", "Result", "Scorecard"]).style(
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -1121,6 +1121,8 @@ mod tests {
         }
         let full_screen = lines.join("\n");
         assert!(full_screen.contains("17 Oct 2026"));
+        assert!(full_screen.contains("Result"));
+        assert!(!full_screen.contains("Status"));
         assert!(full_screen.contains("Daniel Dubois v Fabio Wardley"));
         assert!(!full_screen.contains("Daniel Dubois v Fabio Wardley (17 Oct 2026)"));
         assert!(
