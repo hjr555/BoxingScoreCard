@@ -1,2 +1,16 @@
+# Rust / Cargo
 /target
+**/*.rs.bk
+
+# Local match data
 /*.json
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
