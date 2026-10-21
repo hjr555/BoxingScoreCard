@@ -185,14 +185,6 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             KeyCode::Char('q') | KeyCode::Char('Q') => app.should_quit = true,
             KeyCode::Char('n') | KeyCode::Char('N') => app.open_new_match_form(),
             KeyCode::Char('b') | KeyCode::Char('B') => app.open_boxrec_editor(),
-            KeyCode::Char('f')
-            | KeyCode::Char('F')
-            | KeyCode::Char('s')
-            | KeyCode::Char('S')
-            | KeyCode::Char('x')
-            | KeyCode::Char('X') => {
-                app.open_finish_match_modal();
-            }
             KeyCode::Up | KeyCode::Char('k') => {
                 app.confirm_delete_id = None;
                 if app.selected_match_idx > 0 {
@@ -203,6 +195,27 @@ fn handle_key_event(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                 app.confirm_delete_id = None;
                 if app.selected_match_idx + 1 < app.matches.len() {
                     app.selected_match_idx += 1;
+                }
+            }
+            KeyCode::PageUp => {
+                app.confirm_delete_id = None;
+                app.selected_match_idx = app.selected_match_idx.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                app.confirm_delete_id = None;
+                if !app.matches.is_empty() {
+                    app.selected_match_idx =
+                        (app.selected_match_idx + 10).min(app.matches.len() - 1);
+                }
+            }
+            KeyCode::Home => {
+                app.confirm_delete_id = None;
+                app.selected_match_idx = 0;
+            }
+            KeyCode::End => {
+                app.confirm_delete_id = None;
+                if !app.matches.is_empty() {
+                    app.selected_match_idx = app.matches.len() - 1;
                 }
             }
             KeyCode::Enter | KeyCode::Char('o') | KeyCode::Char('O') => {

@@ -238,7 +238,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
     }
 
     let btn = Paragraph::new(
-        " [N]ew   [O]pen   [F]inish   [B]oxRec   [D]elete   [Q]uit ",
+        " [N]ew  [O]pen  [D]elete   │   [B]oxRec   │   [Q]uit ",
     )
     .alignment(Alignment::Center)
     .style(
@@ -1133,7 +1133,8 @@ mod tests {
         assert!(full_screen.contains("Dubois by TKO (R2)"));
         assert!(full_screen.contains("10 - 9"));
         assert!(!full_screen.contains("Dubois 10 - 9 Wardley"));
-        assert!(full_screen.contains("[N]ew   [O]pen   [F]inish   [B]oxRec   [D]elete   [Q]uit"));
+        assert!(full_screen.contains("[N]ew  [O]pen  [D]elete   │   [B]oxRec   │   [Q]uit"));
+        assert!(!full_screen.contains("[F]inish"));
         assert!(!full_screen.contains("[Enter] Open"));
         assert!(!full_screen.contains("FINAL:"));
         assert!(!full_screen.contains("Walkout"));

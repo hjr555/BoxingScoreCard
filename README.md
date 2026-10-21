@@ -60,11 +60,10 @@ By default, your scorecards are saved automatically to `matches.json` in the cur
 | Action | Shortcut |
 | :--- | :--- |
 | **New Match** | `n` |
-| **Select Match** | `↑` / `↓` or `k` / `j` |
+| **Select Match** | `↑` / `↓`, `k` / `j`, `PgUp` / `PgDn`, `Home` / `End` |
 | **Open Match** | `o` or `Enter` |
-| **Finish / Edit Result** | `f`, `s`, or `x` |
-| **Edit BoxRec IDs** | `b` |
 | **Delete Match** | `d` or `Delete` (`y` / `d` to confirm, `Esc` to cancel) |
+| **Edit BoxRec IDs** | `b` |
 | **Quit** | `q` or `Ctrl+C` |
 
 ### Scoring Screen
