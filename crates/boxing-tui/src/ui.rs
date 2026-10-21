@@ -1117,4 +1117,195 @@ mod tests {
             .collect();
         assert_eq!(green_rows.len(), 1);
     }
+
+    fn buffer_to_svg(buf: &ratatui::buffer::Buffer, title: &str) -> String {
+        let cell_w = 9.0f64;
+        let cell_h = 19.0f64;
+        let pad_x = 18.0f64;
+        let pad_y = 44.0f64;
+        let bottom_pad = 16.0f64;
+        let svg_w = pad_x * 2.0 + (buf.area.width as f64) * cell_w;
+        let svg_h = pad_y + bottom_pad + (buf.area.height as f64) * cell_h;
+
+        let color_hex = |c: Color, is_bg: bool| -> &'static str {
+            match c {
+                Color::Reset => {
+                    if is_bg {
+                        "#0d1117"
+                    } else {
+                        "#e6edf3"
+                    }
+                }
+                Color::Black => "#0d1117",
+                Color::Red => "#da3633",
+                Color::Green => "#2ea043",
+                Color::Yellow => "#d29922",
+                Color::Blue => "#1f6feb",
+                Color::Magenta => "#8957e5",
+                Color::Cyan => "#39c5cf",
+                Color::Gray => "#8b949e",
+                Color::DarkGray => "#484f58",
+                Color::LightRed => "#ff7b72",
+                Color::LightGreen => "#3fb950",
+                Color::LightYellow => "#e3b341",
+                Color::LightBlue => "#58a6ff",
+                Color::LightMagenta => "#d2a8ff",
+                Color::LightCyan => "#56d4dd",
+                Color::White => "#f0f6fc",
+                _ => {
+                    if is_bg {
+                        "#0d1117"
+                    } else {
+                        "#e6edf3"
+                    }
+                }
+            }
+        };
+
+        let xml_escape = |s: &str| -> String {
+            s.replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+        };
+
+        let mut out = String::new();
+        out.push_str(&format!(
+            r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {svg_w} {svg_h}" width="100%">
+  <defs>
+    <style>
+      .term-text {{
+        font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        font-size: 14px;
+        white-space: pre;
+      }}
+      .title-text {{
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        font-size: 12px;
+        fill: #8b949e;
+        font-weight: 600;
+      }}
+    </style>
+  </defs>
+  <rect width="{svg_w}" height="{svg_h}" rx="10" ry="10" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+  <rect width="{svg_w}" height="32" rx="10" ry="10" fill="#161b22"/>
+  <rect y="22" width="{svg_w}" height="10" fill="#161b22"/>
+  <line x1="0" y1="32" x2="{svg_w}" y2="32" stroke="#30363d" stroke-width="1"/>
+  <circle cx="18" cy="16" r="6" fill="#ff5f56"/>
+  <circle cx="38" cy="16" r="6" fill="#ffbd2e"/>
+  <circle cx="58" cy="16" r="6" fill="#27c93f"/>
+  <text x="{}" y="20" text-anchor="middle" class="title-text">{}</text>
+"##,
+            svg_w / 2.0,
+            xml_escape(title)
+        ));
+
+        // 1. Render cell backgrounds
+        for y in 0..buf.area.height {
+            let mut x = 0;
+            while x < buf.area.width {
+                let bg = buf[(x, y)].bg;
+                if bg != Color::Reset && bg != Color::Black {
+                    let start_x = x;
+                    while x < buf.area.width && buf[(x, y)].bg == bg {
+                        x += 1;
+                    }
+                    let rx = pad_x + (start_x as f64) * cell_w;
+                    let ry = pad_y + (y as f64) * cell_h;
+                    let rw = ((x - start_x) as f64) * cell_w;
+                    out.push_str(&format!(
+                        r#"  <rect x="{rx:.1}" y="{ry:.1}" width="{rw:.1}" height="{cell_h:.1}" fill="{}"/>"#,
+                        color_hex(bg, true)
+                    ));
+                    out.push('\n');
+                } else {
+                    x += 1;
+                }
+            }
+        }
+
+        // 2. Render cell glyphs
+        for y in 0..buf.area.height {
+            for x in 0..buf.area.width {
+                let cell = &buf[(x, y)];
+                let sym = cell.symbol();
+                if sym.trim().is_empty() {
+                    continue;
+                }
+                let cx = pad_x + (x as f64) * cell_w;
+                let cy = pad_y + (y as f64) * cell_h + 14.5;
+                let fg = color_hex(cell.fg, false);
+                let mut attrs = String::new();
+                if cell.modifier.contains(Modifier::BOLD) {
+                    attrs.push_str(r#" font-weight="bold""#);
+                }
+                if cell.modifier.contains(Modifier::ITALIC) {
+                    attrs.push_str(r#" font-style="italic""#);
+                }
+                if cell.modifier.contains(Modifier::UNDERLINED) {
+                    attrs.push_str(r#" text-decoration="underline""#);
+                }
+                out.push_str(&format!(
+                    r#"  <text x="{cx:.1}" y="{cy:.1}" fill="{fg}" class="term-text"{attrs}>{}</text>"#,
+                    xml_escape(sym)
+                ));
+                out.push('\n');
+            }
+        }
+
+        out.push_str("</svg>\n");
+        out
+    }
+
+    #[test]
+    #[ignore]
+    fn generate_readme_screenshots() {
+        let test_db = PathBuf::from("../../matches.test.json");
+        let repo = JsonMatchRepository::new(test_db);
+        let service = ScoringService::new(repo);
+        let mut app = App::new(service);
+        app.status_message = format!("Loaded matches.test.json ({} matches)", app.matches.len());
+
+        // 1. Matches (Home) screen
+        let backend_home = TestBackend::new(104, 22);
+        let mut term_home = Terminal::new(backend_home).unwrap();
+        term_home.draw(|f| draw(f, &mut app)).unwrap();
+        let svg_home = buffer_to_svg(term_home.backend().buffer(), "boxing — Matches");
+        std::fs::create_dir_all("../../docs").unwrap();
+        std::fs::write("../../docs/matches-screen.svg", svg_home).unwrap();
+
+        // 2. Live Scoring screen (in-progress fight: Usyk vs Fury Round 7)
+        let mut live_match = BoxingMatch::new(
+            "Oleksandr Usyk",
+            "Tyson Fury",
+            NaiveDate::from_ymd_opt(2024, 5, 18).unwrap(),
+        );
+        live_match.set_boxrec_id(FighterSide::FighterA, "659772");
+        live_match.set_boxrec_id(FighterSide::FighterB, "479205");
+        // Lock walkout (10-9) and Rounds 1..=6
+        live_match.deduct_point(FighterSide::FighterB);
+        live_match.lock_round();
+        let r_scores = [(10, 9), (10, 9), (9, 10), (9, 10), (9, 10), (9, 10)];
+        for (sa, sb) in r_scores {
+            for _ in 0..(10 - sa) {
+                live_match.deduct_point(FighterSide::FighterA);
+            }
+            for _ in 0..(10 - sb) {
+                live_match.deduct_point(FighterSide::FighterB);
+            }
+            live_match.lock_round();
+        }
+        // In Round 7, Usyk 10 - 9 Fury so far
+        live_match.deduct_point(FighterSide::FighterB);
+        app.start_scoring_match(live_match);
+        if let Some(ref mut t) = app.timer {
+            t.remaining = std::time::Duration::from_secs(84); // 01:24 remaining in Round 7
+        }
+
+        let backend_scoring = TestBackend::new(104, 24);
+        let mut term_scoring = Terminal::new(backend_scoring).unwrap();
+        term_scoring.draw(|f| draw(f, &mut app)).unwrap();
+        let svg_scoring = buffer_to_svg(term_scoring.backend().buffer(), "boxing — Scoring");
+        std::fs::write("../../docs/scoring-screen.svg", svg_scoring).unwrap();
+    }
 }

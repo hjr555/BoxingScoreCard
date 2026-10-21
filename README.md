@@ -7,6 +7,16 @@
 Just for fun! I like scoring boxing matches when I watch them, and wanted a simple way to record these, and refer back to them.
 Keyboard driven, round-by-round fight scores, pre-fight walkouts, round timers, and fight outcomes.
 
+## Screenshots
+
+**Matches Screen**
+![Matches Screen](docs/matches-screen.svg)
+
+**Live Round-by-Round Scoring**
+![Scoring Screen](docs/scoring-screen.svg)
+
+---
+
 ## Features
 
 - **10-Point Must Scoring**: Starts both fighters at 10 points each round with single-keystroke point deductions (`-1`), restorations (`+1`), round lock-in, and multi-step undo.
