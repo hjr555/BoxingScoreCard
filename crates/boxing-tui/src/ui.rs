@@ -116,6 +116,12 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         if !app.matches.windows(2).all(|w| w[0].date >= w[1].date) {
             app.matches.sort_by(|a, b| b.date.cmp(&a.date));
         }
+        let max_fa_w = app
+            .matches
+            .iter()
+            .map(|m| m.fighter_a.chars().count())
+            .max()
+            .unwrap_or(0);
         let rows: Vec<Row> = app
             .matches
             .iter()
@@ -135,7 +141,10 @@ fn draw_home(f: &mut Frame, app: &mut App) {
 
                 let date_line = Line::from(m.date.format("%d %b %Y").to_string());
 
+                let fa_len = m.fighter_a.chars().count();
+                let fa_pad = " ".repeat(max_fa_w.saturating_sub(fa_len));
                 let match_line = Line::from(vec![
+                    Span::raw(fa_pad),
                     if m.fighter_a_boxrec_id.is_some() {
                         Span::styled(m.fighter_a.clone(), link_mod)
                     } else {
@@ -172,10 +181,17 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         let table_block = Block::default().borders(Borders::ALL).title(" Matches ");
         let table_inner = table_block.inner(chunks[1]);
 
+        let match_header = format!("{}Match", " ".repeat(max_fa_w.saturating_sub(1)));
         let table = Table::new(rows, col_widths)
             .column_spacing(2)
             .header(
-                Row::new(vec!["Date", "Match", "Result", "Scorecard"]).style(
+                Row::new(vec![
+                    "Date".to_string(),
+                    match_header,
+                    "Result".to_string(),
+                    "Scorecard".to_string(),
+                ])
+                .style(
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -208,19 +224,22 @@ fn draw_home(f: &mut Frame, app: &mut App) {
             }
             let fa_full_w = m.fighter_a.chars().count() as u16;
             let fb_full_w = m.fighter_b.chars().count() as u16;
+            let fa_pad_w = (max_fa_w as u16).saturating_sub(fa_full_w);
 
             if let Some(ref id_a) = m.fighter_a_boxrec_id {
                 let url_a = boxrec_url(id_a);
-                let w_match = fa_full_w.min(cols[1].width);
-                if w_match > 0 {
-                    app.clickable_links
-                        .push((cols[1].x, row_y, w_match, url_a));
+                if fa_pad_w < cols[1].width {
+                    let w_match = fa_full_w.min(cols[1].width - fa_pad_w);
+                    if w_match > 0 {
+                        app.clickable_links
+                            .push((cols[1].x + fa_pad_w, row_y, w_match, url_a));
+                    }
                 }
             }
 
             if let Some(ref id_b) = m.fighter_b_boxrec_id {
                 let url_b = boxrec_url(id_b);
-                let match_b_offset = fa_full_w.saturating_add(3); // " v "
+                let match_b_offset = (max_fa_w as u16).saturating_add(3); // " v "
                 if match_b_offset < cols[1].width {
                     let w_match = fb_full_w.min(cols[1].width - match_b_offset);
                     if w_match > 0 {
@@ -1208,6 +1227,19 @@ mod tests {
         assert!(!full_screen.contains("Status"));
         assert!(full_screen.contains("Daniel Dubois v Fabio Wardley"));
         assert!(!full_screen.contains("Daniel Dubois v Fabio Wardley (17 Oct 2026)"));
+        let dubois_row = lines
+            .iter()
+            .find(|l| l.contains("Daniel Dubois v Fabio Wardley"))
+            .unwrap();
+        let usyk_row = lines
+            .iter()
+            .find(|l| l.contains("Oleksandr Usyk v Tyson Fury"))
+            .unwrap();
+        assert_eq!(
+            dubois_row.find(" v "),
+            usyk_row.find(" v "),
+            "The 'v' separator must stay in the exact same column across rows"
+        );
         assert!(
             full_screen.find("17 Oct 2026").unwrap() < full_screen.find("18 May 2024").unwrap(),
             "Matches should be sorted in reverse date order (most recent first)"
