@@ -25,8 +25,8 @@
   <rect x="36.0" y="82.0" width="387.0" height="19.0" fill="#d29922"/>
   <rect x="450.0" y="82.0" width="126.0" height="19.0" fill="#1f6feb"/>
   <rect x="315.0" y="158.0" width="144.0" height="19.0" fill="#ff7b72"/>
-  <rect x="153.0" y="272.0" width="54.0" height="19.0" fill="#ff7b72"/>
-  <rect x="477.0" y="272.0" width="45.0" height="19.0" fill="#58a6ff"/>
+  <rect x="153.0" y="234.0" width="54.0" height="19.0" fill="#ff7b72"/>
+  <rect x="477.0" y="234.0" width="45.0" height="19.0" fill="#58a6ff"/>
   <rect x="27.0" y="443.0" width="495.0" height="19.0" fill="#2ea043"/>
   <rect x="531.0" y="443.0" width="414.0" height="19.0" fill="#da3633"/>
   <text x="27.0" y="77.5" fill="#e6edf3" class="term-text">┌</text>
@@ -175,36 +175,6 @@
   <text x="531.0" y="96.5" fill="#f0f6fc" class="term-text" font-weight="bold">/</text>
   <text x="549.0" y="96.5" fill="#f0f6fc" class="term-text" font-weight="bold">1</text>
   <text x="558.0" y="96.5" fill="#f0f6fc" class="term-text" font-weight="bold">2</text>
-  <text x="603.0" y="96.5" fill="#e6edf3" class="term-text">S</text>
-  <text x="612.0" y="96.5" fill="#e6edf3" class="term-text">c</text>
-  <text x="621.0" y="96.5" fill="#e6edf3" class="term-text">o</text>
-  <text x="630.0" y="96.5" fill="#e6edf3" class="term-text">r</text>
-  <text x="639.0" y="96.5" fill="#e6edf3" class="term-text">e</text>
-  <text x="648.0" y="96.5" fill="#e6edf3" class="term-text">:</text>
-  <text x="666.0" y="96.5" fill="#e6edf3" class="term-text">O</text>
-  <text x="675.0" y="96.5" fill="#e6edf3" class="term-text">l</text>
-  <text x="684.0" y="96.5" fill="#e6edf3" class="term-text">e</text>
-  <text x="693.0" y="96.5" fill="#e6edf3" class="term-text">k</text>
-  <text x="702.0" y="96.5" fill="#e6edf3" class="term-text">s</text>
-  <text x="711.0" y="96.5" fill="#e6edf3" class="term-text">a</text>
-  <text x="720.0" y="96.5" fill="#e6edf3" class="term-text">n</text>
-  <text x="729.0" y="96.5" fill="#e6edf3" class="term-text">d</text>
-  <text x="738.0" y="96.5" fill="#e6edf3" class="term-text">r</text>
-  <text x="756.0" y="96.5" fill="#e6edf3" class="term-text">U</text>
-  <text x="765.0" y="96.5" fill="#e6edf3" class="term-text">s</text>
-  <text x="774.0" y="96.5" fill="#e6edf3" class="term-text">y</text>
-  <text x="783.0" y="96.5" fill="#e6edf3" class="term-text">k</text>
-  <text x="801.0" y="96.5" fill="#e6edf3" class="term-text">5</text>
-  <text x="810.0" y="96.5" fill="#e6edf3" class="term-text">6</text>
-  <text x="828.0" y="96.5" fill="#e6edf3" class="term-text">-</text>
-  <text x="846.0" y="96.5" fill="#e6edf3" class="term-text">5</text>
-  <text x="855.0" y="96.5" fill="#e6edf3" class="term-text">8</text>
-  <text x="873.0" y="96.5" fill="#e6edf3" class="term-text">T</text>
-  <text x="882.0" y="96.5" fill="#e6edf3" class="term-text">y</text>
-  <text x="891.0" y="96.5" fill="#e6edf3" class="term-text">s</text>
-  <text x="900.0" y="96.5" fill="#e6edf3" class="term-text">o</text>
-  <text x="909.0" y="96.5" fill="#e6edf3" class="term-text">n</text>
-  <text x="927.0" y="96.5" fill="#e6edf3" class="term-text">F</text>
   <text x="936.0" y="96.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="115.5" fill="#e6edf3" class="term-text">└</text>
   <text x="36.0" y="115.5" fill="#e6edf3" class="term-text">─</text>
@@ -614,19 +584,19 @@
   <text x="927.0" y="191.5" fill="#e6edf3" class="term-text">─</text>
   <text x="936.0" y="191.5" fill="#e6edf3" class="term-text">┘</text>
   <text x="27.0" y="210.5" fill="#ff7b72" class="term-text">┌</text>
-  <text x="45.0" y="210.5" fill="#ff7b72" class="term-text">O</text>
-  <text x="54.0" y="210.5" fill="#ff7b72" class="term-text">L</text>
-  <text x="63.0" y="210.5" fill="#ff7b72" class="term-text">E</text>
-  <text x="72.0" y="210.5" fill="#ff7b72" class="term-text">K</text>
-  <text x="81.0" y="210.5" fill="#ff7b72" class="term-text">S</text>
-  <text x="90.0" y="210.5" fill="#ff7b72" class="term-text">A</text>
-  <text x="99.0" y="210.5" fill="#ff7b72" class="term-text">N</text>
-  <text x="108.0" y="210.5" fill="#ff7b72" class="term-text">D</text>
-  <text x="117.0" y="210.5" fill="#ff7b72" class="term-text">R</text>
-  <text x="135.0" y="210.5" fill="#ff7b72" class="term-text">U</text>
-  <text x="144.0" y="210.5" fill="#ff7b72" class="term-text">S</text>
-  <text x="153.0" y="210.5" fill="#ff7b72" class="term-text">Y</text>
-  <text x="162.0" y="210.5" fill="#ff7b72" class="term-text">K</text>
+  <text x="45.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">O</text>
+  <text x="54.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">L</text>
+  <text x="63.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">E</text>
+  <text x="72.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">K</text>
+  <text x="81.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">S</text>
+  <text x="90.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">A</text>
+  <text x="99.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">N</text>
+  <text x="108.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">D</text>
+  <text x="117.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">R</text>
+  <text x="135.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">U</text>
+  <text x="144.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">S</text>
+  <text x="153.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">Y</text>
+  <text x="162.0" y="210.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">K</text>
   <text x="180.0" y="210.5" fill="#ff7b72" class="term-text">─</text>
   <text x="189.0" y="210.5" fill="#ff7b72" class="term-text">─</text>
   <text x="198.0" y="210.5" fill="#ff7b72" class="term-text">─</text>
@@ -646,15 +616,15 @@
   <text x="324.0" y="210.5" fill="#ff7b72" class="term-text">─</text>
   <text x="333.0" y="210.5" fill="#ff7b72" class="term-text">┐</text>
   <text x="342.0" y="210.5" fill="#58a6ff" class="term-text">┌</text>
-  <text x="360.0" y="210.5" fill="#58a6ff" class="term-text">T</text>
-  <text x="369.0" y="210.5" fill="#58a6ff" class="term-text">Y</text>
-  <text x="378.0" y="210.5" fill="#58a6ff" class="term-text">S</text>
-  <text x="387.0" y="210.5" fill="#58a6ff" class="term-text">O</text>
-  <text x="396.0" y="210.5" fill="#58a6ff" class="term-text">N</text>
-  <text x="414.0" y="210.5" fill="#58a6ff" class="term-text">F</text>
-  <text x="423.0" y="210.5" fill="#58a6ff" class="term-text">U</text>
-  <text x="432.0" y="210.5" fill="#58a6ff" class="term-text">R</text>
-  <text x="441.0" y="210.5" fill="#58a6ff" class="term-text">Y</text>
+  <text x="360.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">T</text>
+  <text x="369.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">Y</text>
+  <text x="378.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">S</text>
+  <text x="387.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">O</text>
+  <text x="396.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">N</text>
+  <text x="414.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">F</text>
+  <text x="423.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">U</text>
+  <text x="432.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">R</text>
+  <text x="441.0" y="210.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">Y</text>
   <text x="459.0" y="210.5" fill="#58a6ff" class="term-text">─</text>
   <text x="468.0" y="210.5" fill="#58a6ff" class="term-text">─</text>
   <text x="477.0" y="210.5" fill="#58a6ff" class="term-text">─</text>
@@ -708,30 +678,8 @@
   <text x="927.0" y="210.5" fill="#e6edf3" class="term-text">─</text>
   <text x="936.0" y="210.5" fill="#e6edf3" class="term-text">┐</text>
   <text x="27.0" y="229.5" fill="#ff7b72" class="term-text">│</text>
-  <text x="117.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">O</text>
-  <text x="126.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">l</text>
-  <text x="135.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">e</text>
-  <text x="144.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">k</text>
-  <text x="153.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">s</text>
-  <text x="162.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">a</text>
-  <text x="171.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">n</text>
-  <text x="180.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">d</text>
-  <text x="189.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">r</text>
-  <text x="207.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">U</text>
-  <text x="216.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">s</text>
-  <text x="225.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">y</text>
-  <text x="234.0" y="229.5" fill="#ff7b72" class="term-text" font-weight="bold" text-decoration="underline">k</text>
   <text x="333.0" y="229.5" fill="#ff7b72" class="term-text">│</text>
   <text x="342.0" y="229.5" fill="#58a6ff" class="term-text">│</text>
-  <text x="450.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">T</text>
-  <text x="459.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">y</text>
-  <text x="468.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">s</text>
-  <text x="477.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">o</text>
-  <text x="486.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">n</text>
-  <text x="504.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">F</text>
-  <text x="513.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">u</text>
-  <text x="522.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">r</text>
-  <text x="531.0" y="229.5" fill="#58a6ff" class="term-text" font-weight="bold" text-decoration="underline">y</text>
   <text x="639.0" y="229.5" fill="#58a6ff" class="term-text">│</text>
   <text x="648.0" y="229.5" fill="#e6edf3" class="term-text">│</text>
   <text x="657.0" y="229.5" fill="#d29922" class="term-text" font-weight="bold">R</text>
@@ -749,21 +697,13 @@
   <text x="873.0" y="229.5" fill="#d29922" class="term-text" font-weight="bold" text-decoration="underline">y</text>
   <text x="936.0" y="229.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="248.5" fill="#ff7b72" class="term-text">│</text>
+  <text x="171.0" y="248.5" fill="#0d1117" class="term-text" font-weight="bold">1</text>
+  <text x="180.0" y="248.5" fill="#0d1117" class="term-text" font-weight="bold">0</text>
   <text x="333.0" y="248.5" fill="#ff7b72" class="term-text">│</text>
   <text x="342.0" y="248.5" fill="#58a6ff" class="term-text">│</text>
+  <text x="495.0" y="248.5" fill="#0d1117" class="term-text" font-weight="bold">9</text>
   <text x="639.0" y="248.5" fill="#58a6ff" class="term-text">│</text>
   <text x="648.0" y="248.5" fill="#e6edf3" class="term-text">│</text>
-  <text x="657.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">🎵</text>
-  <text x="684.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">W</text>
-  <text x="693.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">a</text>
-  <text x="702.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">l</text>
-  <text x="711.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">k</text>
-  <text x="720.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">o</text>
-  <text x="729.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">u</text>
-  <text x="738.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">t</text>
-  <text x="756.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">1</text>
-  <text x="765.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">0</text>
-  <text x="846.0" y="248.5" fill="#d2a8ff" class="term-text" font-weight="bold" font-style="italic">9</text>
   <text x="936.0" y="248.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="267.5" fill="#ff7b72" class="term-text">│</text>
   <text x="333.0" y="267.5" fill="#ff7b72" class="term-text">│</text>
@@ -777,11 +717,28 @@
   <text x="846.0" y="267.5" fill="#ff7b72" class="term-text">9</text>
   <text x="936.0" y="267.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="286.5" fill="#ff7b72" class="term-text">│</text>
-  <text x="171.0" y="286.5" fill="#0d1117" class="term-text" font-weight="bold">1</text>
-  <text x="180.0" y="286.5" fill="#0d1117" class="term-text" font-weight="bold">0</text>
+  <text x="135.0" y="286.5" fill="#f0f6fc" class="term-text">R</text>
+  <text x="144.0" y="286.5" fill="#f0f6fc" class="term-text">O</text>
+  <text x="153.0" y="286.5" fill="#f0f6fc" class="term-text">U</text>
+  <text x="162.0" y="286.5" fill="#f0f6fc" class="term-text">N</text>
+  <text x="171.0" y="286.5" fill="#f0f6fc" class="term-text">D</text>
+  <text x="189.0" y="286.5" fill="#f0f6fc" class="term-text">S</text>
+  <text x="198.0" y="286.5" fill="#f0f6fc" class="term-text">C</text>
+  <text x="207.0" y="286.5" fill="#f0f6fc" class="term-text">O</text>
+  <text x="216.0" y="286.5" fill="#f0f6fc" class="term-text">R</text>
+  <text x="225.0" y="286.5" fill="#f0f6fc" class="term-text">E</text>
   <text x="333.0" y="286.5" fill="#ff7b72" class="term-text">│</text>
   <text x="342.0" y="286.5" fill="#58a6ff" class="term-text">│</text>
-  <text x="495.0" y="286.5" fill="#0d1117" class="term-text" font-weight="bold">9</text>
+  <text x="450.0" y="286.5" fill="#f0f6fc" class="term-text">R</text>
+  <text x="459.0" y="286.5" fill="#f0f6fc" class="term-text">O</text>
+  <text x="468.0" y="286.5" fill="#f0f6fc" class="term-text">U</text>
+  <text x="477.0" y="286.5" fill="#f0f6fc" class="term-text">N</text>
+  <text x="486.0" y="286.5" fill="#f0f6fc" class="term-text">D</text>
+  <text x="504.0" y="286.5" fill="#f0f6fc" class="term-text">S</text>
+  <text x="513.0" y="286.5" fill="#f0f6fc" class="term-text">C</text>
+  <text x="522.0" y="286.5" fill="#f0f6fc" class="term-text">O</text>
+  <text x="531.0" y="286.5" fill="#f0f6fc" class="term-text">R</text>
+  <text x="540.0" y="286.5" fill="#f0f6fc" class="term-text">E</text>
   <text x="639.0" y="286.5" fill="#58a6ff" class="term-text">│</text>
   <text x="648.0" y="286.5" fill="#e6edf3" class="term-text">│</text>
   <text x="657.0" y="286.5" fill="#ff7b72" class="term-text">R</text>
@@ -802,28 +759,8 @@
   <text x="855.0" y="305.5" fill="#58a6ff" class="term-text">0</text>
   <text x="936.0" y="305.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="324.5" fill="#ff7b72" class="term-text">│</text>
-  <text x="135.0" y="324.5" fill="#f0f6fc" class="term-text">R</text>
-  <text x="144.0" y="324.5" fill="#f0f6fc" class="term-text">O</text>
-  <text x="153.0" y="324.5" fill="#f0f6fc" class="term-text">U</text>
-  <text x="162.0" y="324.5" fill="#f0f6fc" class="term-text">N</text>
-  <text x="171.0" y="324.5" fill="#f0f6fc" class="term-text">D</text>
-  <text x="189.0" y="324.5" fill="#f0f6fc" class="term-text">S</text>
-  <text x="198.0" y="324.5" fill="#f0f6fc" class="term-text">C</text>
-  <text x="207.0" y="324.5" fill="#f0f6fc" class="term-text">O</text>
-  <text x="216.0" y="324.5" fill="#f0f6fc" class="term-text">R</text>
-  <text x="225.0" y="324.5" fill="#f0f6fc" class="term-text">E</text>
   <text x="333.0" y="324.5" fill="#ff7b72" class="term-text">│</text>
   <text x="342.0" y="324.5" fill="#58a6ff" class="term-text">│</text>
-  <text x="450.0" y="324.5" fill="#f0f6fc" class="term-text">R</text>
-  <text x="459.0" y="324.5" fill="#f0f6fc" class="term-text">O</text>
-  <text x="468.0" y="324.5" fill="#f0f6fc" class="term-text">U</text>
-  <text x="477.0" y="324.5" fill="#f0f6fc" class="term-text">N</text>
-  <text x="486.0" y="324.5" fill="#f0f6fc" class="term-text">D</text>
-  <text x="504.0" y="324.5" fill="#f0f6fc" class="term-text">S</text>
-  <text x="513.0" y="324.5" fill="#f0f6fc" class="term-text">C</text>
-  <text x="522.0" y="324.5" fill="#f0f6fc" class="term-text">O</text>
-  <text x="531.0" y="324.5" fill="#f0f6fc" class="term-text">R</text>
-  <text x="540.0" y="324.5" fill="#f0f6fc" class="term-text">E</text>
   <text x="639.0" y="324.5" fill="#58a6ff" class="term-text">│</text>
   <text x="648.0" y="324.5" fill="#e6edf3" class="term-text">│</text>
   <text x="657.0" y="324.5" fill="#58a6ff" class="term-text">R</text>
@@ -873,15 +810,6 @@
   <text x="342.0" y="400.5" fill="#58a6ff" class="term-text">│</text>
   <text x="639.0" y="400.5" fill="#58a6ff" class="term-text">│</text>
   <text x="648.0" y="400.5" fill="#e6edf3" class="term-text">│</text>
-  <text x="657.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">T</text>
-  <text x="666.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">O</text>
-  <text x="675.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">T</text>
-  <text x="684.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">A</text>
-  <text x="693.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">L</text>
-  <text x="756.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">5</text>
-  <text x="765.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">6</text>
-  <text x="846.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">5</text>
-  <text x="855.0" y="400.5" fill="#2ea043" class="term-text" font-weight="bold">8</text>
   <text x="936.0" y="400.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="419.5" fill="#ff7b72" class="term-text">│</text>
   <text x="63.0" y="419.5" fill="#8b949e" class="term-text">[</text>
@@ -920,6 +848,15 @@
   <text x="612.0" y="419.5" fill="#8b949e" class="term-text">E</text>
   <text x="639.0" y="419.5" fill="#58a6ff" class="term-text">│</text>
   <text x="648.0" y="419.5" fill="#e6edf3" class="term-text">│</text>
+  <text x="657.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">T</text>
+  <text x="666.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">O</text>
+  <text x="675.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">T</text>
+  <text x="684.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">A</text>
+  <text x="693.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">L</text>
+  <text x="756.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">5</text>
+  <text x="765.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">6</text>
+  <text x="846.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">5</text>
+  <text x="855.0" y="419.5" fill="#2ea043" class="term-text" font-weight="bold">8</text>
   <text x="936.0" y="419.5" fill="#e6edf3" class="term-text">│</text>
   <text x="27.0" y="438.5" fill="#ff7b72" class="term-text">└</text>
   <text x="36.0" y="438.5" fill="#ff7b72" class="term-text">─</text>
