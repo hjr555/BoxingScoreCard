@@ -46,7 +46,7 @@ By default, your scorecards are saved automatically to `matches.json` in the cur
 
 ## Quick Start: Scoring a Fight
 
-1. **Create a Match**: Press `n` on the **Matches** screen, enter the two fighter names, date (e.g. `01 Jan 2026` or `2026-01-01`), and scheduled rounds (`←` / `→`), then press `Enter`.
+1. **Create a Match**: Press `n` on the **Matches** screen, enter the two fighter names, date (e.g. `2026 Jan 01` or `2026-01-01`), and scheduled rounds (`←` / `→`), then press `Enter`.
 2. **Score the Walkout**: Deduct points with `1` (Fighter 1) or `2` (Fighter 2), then press `Enter` to lock the walkout and start Round 1.
 3. **Score Each Round**: Both fighters start each round at `10`. Press `1` or `2` to deduct points (`9`, `8`, etc.) and `Enter` or `Space` to lock the round and advance.
 4. **Finish the Fight**: Locking the final scheduled round automatically computes a decision from your scorecard. If the fight ends early, press `f` (`TKO`), `k` (`KO`), or `r` (`RTD`) to record the stoppage.

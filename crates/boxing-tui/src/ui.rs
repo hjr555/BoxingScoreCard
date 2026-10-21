@@ -139,7 +139,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                 };
                 let link_mod = Style::default().add_modifier(Modifier::UNDERLINED);
 
-                let date_line = Line::from(m.date.format("%d %b %Y").to_string());
+                let date_line = Line::from(m.date.format("%Y %b %d").to_string());
 
                 let fa_len = m.fighter_a.chars().count();
                 let fa_pad = " ".repeat(max_fa_w.saturating_sub(fa_len));
@@ -1222,7 +1222,7 @@ mod tests {
             lines.push(row);
         }
         let full_screen = lines.join("\n");
-        assert!(full_screen.contains("17 Oct 2026"));
+        assert!(full_screen.contains("2026 Oct 17"));
         assert!(full_screen.contains("Result"));
         assert!(!full_screen.contains("Status"));
         assert!(full_screen.contains("Daniel Dubois v Fabio Wardley"));
@@ -1241,7 +1241,7 @@ mod tests {
             "The 'v' separator must stay in the exact same column across rows"
         );
         assert!(
-            full_screen.find("17 Oct 2026").unwrap() < full_screen.find("18 May 2024").unwrap(),
+            full_screen.find("2026 Oct 17").unwrap() < full_screen.find("2024 May 18").unwrap(),
             "Matches should be sorted in reverse date order (most recent first)"
         );
         assert!(full_screen.contains(APP_VERSION));

@@ -178,7 +178,7 @@ impl App {
             form_field: FormField::FighterA,
             input_fighter_a: String::new(),
             input_fighter_b: String::new(),
-            input_date: today.format("%d %b %Y").to_string(),
+            input_date: today.format("%Y %b %d").to_string(),
             input_rounds: DEFAULT_SCHEDULED_ROUNDS,
             boxrec_target_match_id: None,
             boxrec_target_title: String::new(),
@@ -273,7 +273,7 @@ impl App {
         self.form_field = FormField::FighterA;
         self.input_fighter_a.clear();
         self.input_fighter_b.clear();
-        self.input_date = Local::now().date_naive().format("%d %b %Y").to_string();
+        self.input_date = Local::now().date_naive().format("%Y %b %d").to_string();
         self.input_rounds = DEFAULT_SCHEDULED_ROUNDS;
         self.screen = Screen::NewMatch;
         self.status_message = "New match".to_string();
@@ -520,7 +520,9 @@ impl App {
 
     pub fn parse_input_date(&self) -> Option<NaiveDate> {
         let s = self.input_date.trim();
-        NaiveDate::parse_from_str(s, "%d %b %Y")
+        NaiveDate::parse_from_str(s, "%Y %b %d")
+            .or_else(|_| NaiveDate::parse_from_str(s, "%Y %B %d"))
+            .or_else(|_| NaiveDate::parse_from_str(s, "%d %b %Y"))
             .or_else(|_| NaiveDate::parse_from_str(s, "%d %B %Y"))
             .or_else(|_| NaiveDate::parse_from_str(s, "%Y-%m-%d"))
             .ok()
@@ -539,8 +541,8 @@ impl App {
         };
         let date_str = self
             .parse_input_date()
-            .map(|d| d.format("%d %b %Y").to_string())
-            .unwrap_or_else(|| "Invalid Date (e.g. 01 Jan 2026)".to_string());
+            .map(|d| d.format("%Y %b %d").to_string())
+            .unwrap_or_else(|| "Invalid Date (e.g. 2026 Jan 01)".to_string());
         format!("{} v {} ({})", a, b, date_str)
     }
 
@@ -553,7 +555,7 @@ impl App {
         }
         let Some(date) = self.parse_input_date() else {
             self.status_message =
-                "Invalid date (use '01 Jan 2026' or '2026-01-01').".to_string();
+                "Invalid date (use '2026 Jan 01' or '2026-01-01').".to_string();
             return;
         };
 
