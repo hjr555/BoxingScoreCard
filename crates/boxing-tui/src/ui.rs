@@ -132,8 +132,6 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                         None => "Complete".to_string(),
                     }
                 };
-                let fa_last = fighter_last_name(&m.fighter_a).to_string();
-                let fb_last = fighter_last_name(&m.fighter_b).to_string();
                 let link_mod = Style::default().add_modifier(Modifier::UNDERLINED);
 
                 let date_line = Line::from(m.date.format("%d %b %Y").to_string());
@@ -152,19 +150,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                     },
                 ]);
 
-                let score_line = Line::from(vec![
-                    if m.fighter_a_boxrec_id.is_some() {
-                        Span::styled(fa_last, link_mod)
-                    } else {
-                        Span::raw(fa_last)
-                    },
-                    Span::raw(format!(" {} - {} ", tot_a, tot_b)),
-                    if m.fighter_b_boxrec_id.is_some() {
-                        Span::styled(fb_last, link_mod)
-                    } else {
-                        Span::raw(fb_last)
-                    },
-                ]);
+                let score_line = Line::from(format!("{} - {}", tot_a, tot_b));
 
                 let style = if idx == app.selected_match_idx {
                     Style::default()
@@ -202,7 +188,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         table_state.select(Some(app.selected_match_idx));
         f.render_stateful_widget(table, chunks[1], &mut table_state);
 
-        // Register clickable BoxRec fighter name regions in the Match and Scorecard columns
+        // Register clickable BoxRec fighter name regions in the Match column
         let cols = Layout::default()
             .direction(Direction::Horizontal)
             .spacing(2)
@@ -221,25 +207,15 @@ fn draw_home(f: &mut Frame, app: &mut App) {
             if row_y >= table_inner.y + table_inner.height {
                 break;
             }
-            let (tot_a, tot_b) = m.total_scores();
-            let fa_last = fighter_last_name(&m.fighter_a);
-            let fb_last = fighter_last_name(&m.fighter_b);
             let fa_full_w = m.fighter_a.chars().count() as u16;
             let fb_full_w = m.fighter_b.chars().count() as u16;
-            let fa_last_w = fa_last.chars().count() as u16;
-            let fb_last_w = fb_last.chars().count() as u16;
 
             if let Some(ref id_a) = m.fighter_a_boxrec_id {
                 let url_a = boxrec_url(id_a);
                 let w_match = fa_full_w.min(cols[1].width);
                 if w_match > 0 {
                     app.clickable_links
-                        .push((cols[1].x, row_y, w_match, url_a.clone()));
-                }
-                let w_score = fa_last_w.min(cols[3].width);
-                if w_score > 0 {
-                    app.clickable_links
-                        .push((cols[3].x, row_y, w_score, url_a));
+                        .push((cols[1].x, row_y, w_match, url_a));
                 }
             }
 
@@ -253,19 +229,6 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                             cols[1].x + match_b_offset,
                             row_y,
                             w_match,
-                            url_b.clone(),
-                        ));
-                    }
-                }
-                let score_prefix = format!("{} {} - {} ", fa_last, tot_a, tot_b);
-                let score_b_offset = score_prefix.chars().count() as u16;
-                if score_b_offset < cols[3].width {
-                    let w_score = fb_last_w.min(cols[3].width - score_b_offset);
-                    if w_score > 0 {
-                        app.clickable_links.push((
-                            cols[3].x + score_b_offset,
-                            row_y,
-                            w_score,
                             url_b,
                         ));
                     }
@@ -1166,12 +1129,13 @@ mod tests {
         );
         assert!(full_screen.contains(APP_VERSION));
         assert!(full_screen.contains("Dubois by TKO (R2)"));
-        assert!(full_screen.contains("Dubois 10 - 9 Wardley"));
+        assert!(full_screen.contains("10 - 9"));
+        assert!(!full_screen.contains("Dubois 10 - 9 Wardley"));
         assert!(full_screen.contains("[N]ew   [O]pen   [F]inish   [B]oxRec   [D]elete   [Q]uit"));
         assert!(!full_screen.contains("[Enter] Open"));
         assert!(!full_screen.contains("FINAL:"));
         assert!(!full_screen.contains("Walkout"));
-        assert_eq!(app.clickable_links.len(), 4);
+        assert_eq!(app.clickable_links.len(), 2);
 
         // Verify the green action bar is exactly 1 row high (only 1 row has Color::Green background)
         let green_rows: Vec<u16> = (0..buf.area.height)
