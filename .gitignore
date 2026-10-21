@@ -3,7 +3,8 @@
 **/*.rs.bk
 
 # Local match data
-/*.json
+*.json
+*.json.tmp
 
 # OS & Editor files
 .DS_Store
