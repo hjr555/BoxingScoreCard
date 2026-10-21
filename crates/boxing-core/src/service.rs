@@ -20,7 +20,9 @@ impl<R: MatchRepository> ScoringService<R> {
     }
 
     pub fn list_matches(&self) -> Result<Vec<BoxingMatch>, StorageError> {
-        self.repository.list_matches()
+        let mut matches = self.repository.list_matches()?;
+        matches.sort_by(|a, b| b.date.cmp(&a.date));
+        Ok(matches)
     }
 
     pub fn get_match(&self, id: Uuid) -> Result<BoxingMatch, StorageError> {

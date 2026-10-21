@@ -228,6 +228,7 @@ impl App {
                 } else {
                     self.matches.push(m.clone());
                 }
+                self.matches.sort_by(|a, b| b.date.cmp(&a.date));
                 true
             }
             Err(e) => {

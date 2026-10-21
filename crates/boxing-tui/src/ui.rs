@@ -114,6 +114,9 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title(" Matches "));
         f.render_widget(empty, chunks[1]);
     } else {
+        if !app.matches.windows(2).all(|w| w[0].date >= w[1].date) {
+            app.matches.sort_by(|a, b| b.date.cmp(&a.date));
+        }
         let rows: Vec<Row> = app
             .matches
             .iter()
@@ -133,6 +136,8 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                 let fb_last = fighter_last_name(&m.fighter_b).to_string();
                 let link_mod = Style::default().add_modifier(Modifier::UNDERLINED);
 
+                let date_line = Line::from(m.date.format("%d %b %Y").to_string());
+
                 let match_line = Line::from(vec![
                     if m.fighter_a_boxrec_id.is_some() {
                         Span::styled(m.fighter_a.clone(), link_mod)
@@ -145,7 +150,6 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                     } else {
                         Span::raw(m.fighter_b.clone())
                     },
-                    Span::raw(format!(" ({})", m.date.format("%d %b %Y"))),
                 ]);
 
                 let score_line = Line::from(vec![
@@ -170,14 +174,15 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                 } else {
                     Style::default().fg(Color::White)
                 };
-                Row::new(vec![match_line, Line::from(status), score_line]).style(style)
+                Row::new(vec![date_line, match_line, Line::from(status), score_line]).style(style)
             })
             .collect();
 
         let col_widths = [
-            Constraint::Percentage(48),
-            Constraint::Percentage(26),
-            Constraint::Percentage(26),
+            Constraint::Length(12),
+            Constraint::Percentage(44),
+            Constraint::Percentage(22),
+            Constraint::Percentage(22),
         ];
         let table_block = Block::default().borders(Borders::ALL).title(" Matches ");
         let table_inner = table_block.inner(chunks[1]);
@@ -185,7 +190,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         let table = Table::new(rows, col_widths)
             .column_spacing(2)
             .header(
-                Row::new(vec!["Match", "Status", "Scorecard"]).style(
+                Row::new(vec!["Date", "Match", "Status", "Scorecard"]).style(
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::BOLD),
@@ -226,26 +231,26 @@ fn draw_home(f: &mut Frame, app: &mut App) {
 
             if let Some(ref id_a) = m.fighter_a_boxrec_id {
                 let url_a = boxrec_url(id_a);
-                let w_match = fa_full_w.min(cols[0].width);
+                let w_match = fa_full_w.min(cols[1].width);
                 if w_match > 0 {
                     app.clickable_links
-                        .push((cols[0].x, row_y, w_match, url_a.clone()));
+                        .push((cols[1].x, row_y, w_match, url_a.clone()));
                 }
-                let w_score = fa_last_w.min(cols[2].width);
+                let w_score = fa_last_w.min(cols[3].width);
                 if w_score > 0 {
                     app.clickable_links
-                        .push((cols[2].x, row_y, w_score, url_a));
+                        .push((cols[3].x, row_y, w_score, url_a));
                 }
             }
 
             if let Some(ref id_b) = m.fighter_b_boxrec_id {
                 let url_b = boxrec_url(id_b);
                 let match_b_offset = fa_full_w.saturating_add(3); // " v "
-                if match_b_offset < cols[0].width {
-                    let w_match = fb_full_w.min(cols[0].width - match_b_offset);
+                if match_b_offset < cols[1].width {
+                    let w_match = fb_full_w.min(cols[1].width - match_b_offset);
                     if w_match > 0 {
                         app.clickable_links.push((
-                            cols[0].x + match_b_offset,
+                            cols[1].x + match_b_offset,
                             row_y,
                             w_match,
                             url_b.clone(),
@@ -254,11 +259,11 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                 }
                 let score_prefix = format!("{} {} - {} ", fa_last, tot_a, tot_b);
                 let score_b_offset = score_prefix.chars().count() as u16;
-                if score_b_offset < cols[2].width {
-                    let w_score = fb_last_w.min(cols[2].width - score_b_offset);
+                if score_b_offset < cols[3].width {
+                    let w_score = fb_last_w.min(cols[3].width - score_b_offset);
                     if w_score > 0 {
                         app.clickable_links.push((
-                            cols[2].x + score_b_offset,
+                            cols[3].x + score_b_offset,
                             row_y,
                             w_score,
                             url_b,
@@ -1115,7 +1120,18 @@ mod tests {
             winner: Some(FighterSide::FighterA),
             round: 2,
         });
-        app.matches = vec![m];
+        let mut m2 = BoxingMatch::new(
+            "Oleksandr Usyk",
+            "Tyson Fury",
+            NaiveDate::from_ymd_opt(2024, 5, 18).unwrap(),
+        );
+        m2.finish_match(MatchOutcome {
+            method: FinishMethod::Decision,
+            winner: Some(FighterSide::FighterA),
+            round: 12,
+        });
+        // Insert older match first to verify reverse-date sorting (most recent first)
+        app.matches = vec![m2, m];
 
         let backend = TestBackend::new(110, 20);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -1141,7 +1157,13 @@ mod tests {
             lines.push(row);
         }
         let full_screen = lines.join("\n");
-        assert!(full_screen.contains("Daniel Dubois v Fabio Wardley (17 Oct 2026)"));
+        assert!(full_screen.contains("17 Oct 2026"));
+        assert!(full_screen.contains("Daniel Dubois v Fabio Wardley"));
+        assert!(!full_screen.contains("Daniel Dubois v Fabio Wardley (17 Oct 2026)"));
+        assert!(
+            full_screen.find("17 Oct 2026").unwrap() < full_screen.find("18 May 2024").unwrap(),
+            "Matches should be sorted in reverse date order (most recent first)"
+        );
         assert!(full_screen.contains(APP_VERSION));
         assert!(full_screen.contains("Dubois by TKO (R2)"));
         assert!(full_screen.contains("Dubois 10 - 9 Wardley"));
