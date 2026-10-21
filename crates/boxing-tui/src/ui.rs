@@ -518,7 +518,6 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     // 1. Header
-    let (tot_a, tot_b) = m.total_scores();
     let is_walkout_stage = m
         .active_round
         .as_ref()
@@ -558,10 +557,6 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
                 .bg(badge_bg)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw(format!(
-            "   Score: {} {} - {} {}",
-            m.fighter_a, tot_a, tot_b, m.fighter_b
-        )),
     ]))
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(header, root[0]);
