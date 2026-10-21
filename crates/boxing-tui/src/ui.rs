@@ -659,28 +659,90 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         .map(|r| (r.fighter_a_score, r.fighter_b_score))
         .unwrap_or((0, 0));
 
-    let points_caption = if is_walkout_stage {
-        "WALKOUT"
-    } else if m.active_round.is_some() {
-        "ROUND SCORE"
-    } else {
-        "FINAL"
-    };
-
     let fa_name = m.fighter_a.clone();
     let fb_name = m.fighter_b.clone();
     let fa_boxrec = m.fighter_a_boxrec_id.clone();
     let fb_boxrec = m.fighter_b_boxrec_id.clone();
     let is_active = m.active_round.is_some();
 
+    let (fa_badge, fa_badge_fg, fa_badge_bg, fa_caption, fb_badge, fb_badge_fg, fb_badge_bg, fb_caption) =
+        if is_active {
+            let cap = if is_walkout_stage {
+                "WALKOUT".to_string()
+            } else {
+                "ROUND SCORE".to_string()
+            };
+            (
+                format!("  {}  ", score_a),
+                Color::Black,
+                Color::LightRed,
+                cap.clone(),
+                format!("  {}  ", score_b),
+                Color::Black,
+                Color::LightBlue,
+                cap,
+            )
+        } else if let Some(ref out) = m.outcome {
+            let detail = if out.method == boxing_core::FinishMethod::Decision {
+                out.method.short_label().to_string()
+            } else {
+                format!("{} (R{})", out.method.short_label(), out.round)
+            };
+            match out.winner {
+                Some(FighterSide::FighterA) => (
+                    "  WINNER  ".to_string(),
+                    Color::Black,
+                    Color::Green,
+                    format!("Won by {}", detail),
+                    "  LOSER  ".to_string(),
+                    Color::White,
+                    Color::DarkGray,
+                    format!("Lost by {}", detail),
+                ),
+                Some(FighterSide::FighterB) => (
+                    "  LOSER  ".to_string(),
+                    Color::White,
+                    Color::DarkGray,
+                    format!("Lost by {}", detail),
+                    "  WINNER  ".to_string(),
+                    Color::Black,
+                    Color::Green,
+                    format!("Won by {}", detail),
+                ),
+                None => (
+                    "  DRAW  ".to_string(),
+                    Color::Black,
+                    Color::Yellow,
+                    format!("Draw ({})", detail),
+                    "  DRAW  ".to_string(),
+                    Color::Black,
+                    Color::Yellow,
+                    format!("Draw ({})", detail),
+                ),
+            }
+        } else {
+            (
+                "  COMPLETE  ".to_string(),
+                Color::White,
+                Color::DarkGray,
+                String::new(),
+                "  COMPLETE  ".to_string(),
+                Color::White,
+                Color::DarkGray,
+                String::new(),
+            )
+        };
+
     draw_fighter_card(
         f,
         cards_split[0],
         &fa_name,
         fa_boxrec.as_deref(),
-        score_a,
+        &fa_badge,
+        fa_badge_fg,
+        fa_badge_bg,
         is_active,
-        points_caption,
+        &fa_caption,
         Color::LightRed,
         "[-1] 1 / ← / A   [+1] ! / W",
         &mut app.clickable_links,
@@ -691,9 +753,11 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
         cards_split[1],
         &fb_name,
         fb_boxrec.as_deref(),
-        score_b,
+        &fb_badge,
+        fb_badge_fg,
+        fb_badge_bg,
         is_active,
-        points_caption,
+        &fb_caption,
         Color::LightBlue,
         "[-1] 2 / → / D   [+1] @ / E",
         &mut app.clickable_links,
@@ -789,7 +853,9 @@ fn draw_fighter_card(
     area: Rect,
     name: &str,
     boxrec_id: Option<&str>,
-    score: u8,
+    badge_text: &str,
+    badge_fg: Color,
+    badge_bg: Color,
     is_active: bool,
     points_caption: &str,
     accent: Color,
@@ -836,19 +902,13 @@ fn draw_fighter_card(
         }
     }
 
-    let score_display = if is_active {
-        format!("{}", score)
-    } else {
-        "—".to_string()
-    };
-
     let big_score = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            format!("  {}  ", score_display),
+            badge_text,
             Style::default()
-                .fg(Color::Black)
-                .bg(accent)
+                .fg(badge_fg)
+                .bg(badge_bg)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
