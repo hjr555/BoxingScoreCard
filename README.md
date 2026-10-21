@@ -1,5 +1,9 @@
 # Boxing Scorecard
 
+[![Latest Release](https://img.shields.io/github/v/release/hjr555/BoxingScoreCard?label=Download%20Latest%20Release&style=for-the-badge)](https://github.com/hjr555/BoxingScoreCard/releases/latest)
+
+> **📦 [Download Pre-Built Executables (Windows, Linux, macOS)](https://github.com/hjr555/BoxingScoreCard/releases/latest)** — No Rust or build tools required! Visit the [**Releases Page**](https://github.com/hjr555/BoxingScoreCard/releases) to download and run the latest version directly.
+
 A terminal-based boxing scorecard for tracking round-by-round fight scores, pre-fight walkouts, round timers, and fight outcomes.
 
 ## Features

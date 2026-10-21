@@ -1045,15 +1045,39 @@ fn centered_modal(min_width: u16, min_height: u16, r: Rect) -> Rect {
 mod tests {
     use super::*;
     use crate::app::App;
-    use boxing_core::{JsonMatchRepository, ScoringService};
+    use boxing_core::{
+        BoxingMatch, FighterSide, FinishMethod, JsonMatchRepository, MatchOutcome, RoundScore,
+        ScoringService,
+    };
+    use chrono::NaiveDate;
     use ratatui::{backend::TestBackend, Terminal};
     use std::path::PathBuf;
 
     #[test]
     fn test_home_screen_rendering_has_no_artifacts() {
-        let repo = JsonMatchRepository::new(PathBuf::from("../../matches.json"));
+        let repo = JsonMatchRepository::new(PathBuf::from("nonexistent_test_matches.json"));
         let service = ScoringService::new(repo);
         let mut app = App::new(service);
+
+        let mut m = BoxingMatch::new(
+            "Daniel Dubois",
+            "Fabio Wardley",
+            NaiveDate::from_ymd_opt(2026, 10, 17).unwrap(),
+        );
+        m.set_boxrec_id(FighterSide::FighterA, "787430");
+        m.set_boxrec_id(FighterSide::FighterB, "785893");
+        m.locked_rounds.push(RoundScore {
+            round_number: 1,
+            fighter_a_score: 10,
+            fighter_b_score: 9,
+        });
+        m.finish_match(MatchOutcome {
+            method: FinishMethod::Tko,
+            winner: Some(FighterSide::FighterA),
+            round: 2,
+        });
+        app.matches = vec![m];
+
         let backend = TestBackend::new(110, 20);
         let mut terminal = Terminal::new(backend).unwrap();
 
