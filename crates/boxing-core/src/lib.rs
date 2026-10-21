@@ -282,4 +282,39 @@ mod tests {
             Some("Usyk (DEC)")
         );
     }
+
+    #[test]
+    fn test_matches_test_json_integrity() {
+        let content = std::fs::read_to_string("../../matches.test.json")
+            .expect("matches.test.json must exist");
+        let matches: Vec<BoxingMatch> =
+            serde_json::from_str(&content).expect("matches.test.json must deserialize cleanly");
+        assert_eq!(matches.len(), 100);
+
+        let mut fighter_to_id = std::collections::HashMap::new();
+        let mut id_to_fighter = std::collections::HashMap::new();
+        for m in &matches {
+            let id_a = m.fighter_a_boxrec_id.as_deref().expect("Fighter A BoxRec ID");
+            let id_b = m.fighter_b_boxrec_id.as_deref().expect("Fighter B BoxRec ID");
+            assert!(id_a.chars().all(|c| c.is_ascii_digit()));
+            assert!(id_b.chars().all(|c| c.is_ascii_digit()));
+
+            if let Some(prev) = fighter_to_id.insert(m.fighter_a.clone(), id_a.to_string()) {
+                assert_eq!(prev, id_a, "Inconsistent BoxRec ID for {}", m.fighter_a);
+            }
+            if let Some(prev) = fighter_to_id.insert(m.fighter_b.clone(), id_b.to_string()) {
+                assert_eq!(prev, id_b, "Inconsistent BoxRec ID for {}", m.fighter_b);
+            }
+            if let Some(prev_f) = id_to_fighter.insert(id_a.to_string(), m.fighter_a.clone()) {
+                assert_eq!(prev_f, m.fighter_a, "Duplicate BoxRec ID {} shared by {} and {}", id_a, prev_f, m.fighter_a);
+            }
+            if let Some(prev_f) = id_to_fighter.insert(id_b.to_string(), m.fighter_b.clone()) {
+                assert_eq!(prev_f, m.fighter_b, "Duplicate BoxRec ID {} shared by {} and {}", id_b, prev_f, m.fighter_b);
+            }
+        }
+        assert_eq!(fighter_to_id.get("Francis Ngannou").map(String::as_str), Some("1170712"));
+        assert_eq!(fighter_to_id.get("Anthony Joshua").map(String::as_str), Some("659461"));
+        assert_eq!(fighter_to_id.get("Oleksandr Usyk").map(String::as_str), Some("659772"));
+        assert_eq!(fighter_to_id.get("Tyson Fury").map(String::as_str), Some("479205"));
+    }
 }
