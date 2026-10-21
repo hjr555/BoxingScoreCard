@@ -624,12 +624,13 @@ fn draw_scoring(f: &mut Frame, app: &mut App) {
             )
         };
 
+        let timer_title = if m.active_round.is_some() {
+            " Timer — [P]ause  [T] Next Phase "
+        } else {
+            " Timer "
+        };
         let gauge = Gauge::default()
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Timer — [P]ause  [T] Next Phase "),
-            )
+            .block(Block::default().borders(Borders::ALL).title(timer_title))
             .gauge_style(
                 Style::default()
                     .fg(bar_color)
@@ -859,12 +860,14 @@ fn draw_fighter_card(
     .alignment(Alignment::Center);
     f.render_widget(big_score, rows[1]);
 
-    let instructions = Paragraph::new(Line::from(Span::styled(
-        hint,
-        Style::default().fg(Color::Gray),
-    )))
-    .alignment(Alignment::Center);
-    f.render_widget(instructions, rows[2]);
+    if is_active {
+        let instructions = Paragraph::new(Line::from(Span::styled(
+            hint,
+            Style::default().fg(Color::Gray),
+        )))
+        .alignment(Alignment::Center);
+        f.render_widget(instructions, rows[2]);
+    }
 }
 
 fn draw_scorecard_table(
