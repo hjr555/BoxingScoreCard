@@ -149,7 +149,7 @@ fn draw_home(f: &mut Frame, app: &mut App) {
                     },
                 ]);
 
-                let score_line = Line::from(format!("{} - {}", tot_a, tot_b));
+                let score_line = Line::from(format!("{:>3} - {:<3}", tot_a, tot_b));
 
                 let style = if idx == app.selected_match_idx {
                     Style::default()
@@ -1214,7 +1214,8 @@ mod tests {
         );
         assert!(full_screen.contains(APP_VERSION));
         assert!(full_screen.contains("Dubois by TKO (R2)"));
-        assert!(full_screen.contains("10 - 9"));
+        assert!(full_screen.contains(" 10 - 9  "));
+        assert!(full_screen.contains("  0 - 0  "));
         assert!(!full_screen.contains("Dubois 10 - 9 Wardley"));
         assert!(full_screen.contains("[N]ew  [O]pen  [D]elete   │   [B]oxRec   │   [Q]uit"));
         assert!(!full_screen.contains("[F]inish"));
