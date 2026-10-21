@@ -53,7 +53,6 @@ fn draw_home(f: &mut Frame, app: &mut App) {
             Constraint::Length(3),
             Constraint::Min(8),
             Constraint::Length(1),
-            Constraint::Length(1),
         ])
         .split(f.area());
 
@@ -237,21 +236,38 @@ fn draw_home(f: &mut Frame, app: &mut App) {
         }
     }
 
-    let btn = Paragraph::new(
-        " [N]ew  [O]pen  [D]elete   │   [B]oxRec   │   [Q]uit ",
-    )
-    .alignment(Alignment::Center)
-    .style(
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::Green)
-            .add_modifier(Modifier::BOLD),
-    );
-    f.render_widget(btn, chunks[2]);
-
-    let footer = Paragraph::new(format!(" {}", app.status_message))
-        .style(Style::default().fg(Color::Gray));
-    f.render_widget(footer, chunks[3]);
+    if let Some(confirm_id) = app.confirm_delete_id {
+        let target_name = app
+            .matches
+            .iter()
+            .find(|m| m.id == confirm_id)
+            .map(|m| format!("{} v {}", m.fighter_a, m.fighter_b))
+            .unwrap_or_else(|| "match".to_string());
+        let confirm_bar = Paragraph::new(format!(
+            " Delete '{}'?   [Y]/[D] Confirm   [Esc] Cancel ",
+            target_name
+        ))
+        .alignment(Alignment::Center)
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .bg(Color::Red)
+                .add_modifier(Modifier::BOLD),
+        );
+        f.render_widget(confirm_bar, chunks[2]);
+    } else {
+        let btn = Paragraph::new(
+            " [N]ew  [O]pen  [D]elete   │   [B]oxRec   │   [Q]uit ",
+        )
+        .alignment(Alignment::Center)
+        .style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        );
+        f.render_widget(btn, chunks[2]);
+    }
 }
 
 fn draw_new_match_modal(f: &mut Frame, app: &mut App) {
@@ -1140,11 +1156,11 @@ mod tests {
         assert!(!full_screen.contains("Walkout"));
         assert_eq!(app.clickable_links.len(), 2);
 
-        // Verify the green action bar is exactly 1 row high (only 1 row has Color::Green background)
+        // Verify the green action bar is 1 row high at the bottom of the inner area (no status row below it)
         let green_rows: Vec<u16> = (0..buf.area.height)
             .filter(|&y| (0..buf.area.width).any(|x| buf[(x, y)].bg == Color::Green))
             .collect();
-        assert_eq!(green_rows.len(), 1);
+        assert_eq!(green_rows, vec![buf.area.height - 2]);
 
         // Verify update indicator and clickable GitHub Releases link when behind latest version
         app.latest_release_version = Some("v99.0.0".to_string());
